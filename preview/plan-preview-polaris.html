@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Speed Scratcher — Plan page preview (Polaris)</title>
+    <link rel="preconnect" href="https://cdn.shopify.com/" />
+    <link
+      rel="stylesheet"
+      href="https://cdn.shopify.com/static/fonts/inter/v4/styles.css"
+    />
+    <script src="https://cdn.shopify.com/shopifycloud/polaris.js"></script>
+    <style>
+      body {
+        margin: 0;
+        background: var(--p-color-bg-surface, #f1f2f3);
+        font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          Roboto, sans-serif;
+      }
+      .page-shell {
+        max-width: 1120px;
+        margin: 0 auto;
+        padding: 24px 20px 64px;
+      }
+      .preview-bar {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        padding: 12px 20px;
+        background: #1a1a1a;
+        color: #fff;
+      }
+      .preview-bar__label {
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        opacity: 0.7;
+        margin-right: 4px;
+      }
+      .preview-bar button {
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        background: rgba(255, 255, 255, 0.08);
+        color: #fff;
+        font: inherit;
+        font-size: 13px;
+        padding: 6px 12px;
+        border-radius: 8px;
+        cursor: pointer;
+      }
+      .preview-bar button[aria-pressed="true"] {
+        background: #008060;
+        border-color: #008060;
+      }
+      /* Card wrapper: the green "Most Popular" border isn't available in Polaris
+         web components, so it lives on a wrapper div (as in the real route). */
+      .ss-plan-card {
+        background: #fff;
+        border: 1px solid #e1e3e5;
+        border-radius: 16px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+        height: 100%;
+        transition: box-shadow 0.2s ease;
+      }
+      .ss-plan-card:hover {
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+      }
+      .ss-plan-card--popular {
+        border: 2px solid #008060;
+        box-shadow: 0 8px 24px rgba(0, 128, 96, 0.12);
+      }
+      .ss-plan-card__inner {
+        box-sizing: border-box;
+        padding: 20px;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+      }
+      .ss-plan-price {
+        font-size: 34px;
+        font-weight: 650;
+        letter-spacing: -0.5px;
+      }
+      .ss-plan-price__suffix {
+        margin-left: 4px;
+        font-size: 14px;
+        color: #6d7175;
+      }
+      .ss-compare-scroll {
+        max-width: 100%;
+        overflow-x: auto;
+      }
+      .ss-cta-row {
+        margin-top: auto;
+      }
+      .ss-note {
+        color: var(--p-color-text-subdued, #6d7175);
+        font-size: 12.5px;
+        line-height: 1.5;
+        margin-top: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="preview-bar">
+      <span class="preview-bar__label">Preview state</span>
+      <button data-state="new" aria-pressed="true">New customer</button>
+      <button data-state="active" aria-pressed="false">Active · Pro</button>
+      <button data-state="pending" aria-pressed="false">Pending · Pro</button>
+      <button data-state="cancelled" aria-pressed="false">Cancelled</button>
+    </div>
+
+    <div class="page-shell">
+      <div id="page"></div>
+    </div>
+
+    <script>
+      const PLANS = [
+        {
+          key: "basic",
+          name: "Basic",
+          price: 9.99,
+          description: "Perfect for growing stores",
+          popular: false,
+          features: [
+            "Automatic speed optimization",
+            "Image compression",
+            "Lazy-load optimization",
+            "Basic analytics",
+            "Email support",
+          ],
+          e: {
+            speedOptimization: true,
+            imageCompression: true,
+            lazyLoad: true,
+            coreWebVitals: false,
+            jsCssOptimization: false,
+            performanceRecommendations: false,
+            customRules: false,
+            advancedAnalytics: false,
+            prioritySupport: false,
+            dedicatedSupport: false,
+          },
+        },
+        {
+          key: "pro",
+          name: "Pro",
+          price: 19.99,
+          description: "Best for established stores",
+          popular: true,
+          features: [
+            "All Basic features",
+            "Advanced speed optimization",
+            "Core Web Vitals improvements",
+            "JavaScript and CSS optimization",
+            "Performance recommendations",
+            "Priority support",
+          ],
+          e: {
+            speedOptimization: true,
+            imageCompression: true,
+            lazyLoad: true,
+            coreWebVitals: true,
+            jsCssOptimization: true,
+            performanceRecommendations: true,
+            customRules: false,
+            advancedAnalytics: false,
+            prioritySupport: true,
+            dedicatedSupport: false,
+          },
+        },
+        {
+          key: "advanced",
+          name: "Advanced",
+          price: 39.99,
+          description: "For high-volume stores",
+          popular: false,
+          features: [
+            "All Pro features",
+            "Advanced caching and optimization",
+            "Custom optimization rules",
+            "Advanced performance analytics",
+            "Dedicated performance support",
+          ],
+          e: {
+            speedOptimization: true,
+            imageCompression: true,
+            lazyLoad: true,
+            coreWebVitals: true,
+            jsCssOptimization: true,
+            performanceRecommendations: true,
+            customRules: true,
+            advancedAnalytics: true,
+            prioritySupport: true,
+            dedicatedSupport: true,
+          },
+        },
+      ];
+
+      const ROWS = [
+        ["speedOptimization", "Automatic speed optimization"],
+        ["imageCompression", "Image compression"],
+        ["lazyLoad", "Lazy-load optimization"],
+        ["coreWebVitals", "Core Web Vitals improvements"],
+        ["jsCssOptimization", "JavaScript and CSS optimization"],
+        ["performanceRecommendations", "Performance recommendations"],
+        ["customRules", "Custom optimization rules"],
+        ["advancedAnalytics", "Advanced analytics"],
+        ["prioritySupport", "Priority support"],
+        ["dedicatedSupport", "Dedicated performance support"],
+      ];
+
+      const money = (n) => "$" + n.toFixed(2);
+
+      const SUBSCRIPTIONS = {
+        new: null,
+        active: {
+          planKey: "pro",
+          planName: "Pro",
+          status: "ACTIVE",
+          isActive: true,
+          isPending: false,
+          price: 19.99,
+          trialEndsAt: "Oct 24, 2026",
+          currentPeriodEnd: "Nov 9, 2026",
+        },
+        pending: {
+          planKey: "pro",
+          planName: "Pro",
+          status: "PENDING",
+          isActive: false,
+          isPending: true,
+          price: 19.99,
+        },
+        cancelled: null,
+      };
+
+      let state = "new";
+      let sub = null;
+
+      function actionFor(plan) {
+        if (!sub)
+          return {
+            label: "Start 14-day free trial",
+            disabled: false,
+            primary: plan.popular,
+          };
+        if (sub.isActive) {
+          if (sub.planKey === plan.key)
+            return { label: "Your current plan", disabled: true, primary: false };
+          return {
+            label: `Switch to ${plan.name}`,
+            disabled: false,
+            primary: plan.popular,
+          };
+        }
+        if (sub.isPending) {
+          if (sub.planKey === plan.key)
+            return { label: "Awaiting approval", disabled: true, primary: false };
+          return { label: "Pending approval", disabled: true, primary: false };
+        }
+        return {
+          label: "Start 14-day free trial",
+          disabled: false,
+          primary: plan.popular,
+        };
+      }
+
+      function cardFor(plan) {
+        const a = actionFor(plan);
+        const badges = [];
+        if (plan.popular) badges.push('<s-badge tone="success">Most Popular</s-badge>');
+        if (sub && sub.isActive && sub.planKey === plan.key)
+          badges.push('<s-badge tone="success">Current plan</s-badge>');
+        if (sub && sub.isPending && sub.planKey === plan.key)
+          badges.push('<s-badge tone="info">Awaiting approval</s-badge>');
+        return `
+          <div class="ss-plan-card ${plan.popular ? "ss-plan-card--popular" : ""}">
+            <div class="ss-plan-card__inner">
+              <s-stack direction="block" gap="base">
+                <s-stack direction="inline" gap="small" alignitems="center">
+                  <s-heading>${plan.name}</s-heading>
+                  ${badges.join("")}
+                </s-stack>
+                <div>
+                  <span class="ss-plan-price">${money(plan.price)}</span>
+                  <span class="ss-plan-price__suffix">/month</span>
+                </div>
+                <s-text color="subdued">${plan.description}</s-text>
+                <s-divider></s-divider>
+                <s-unordered-list>
+                  ${plan.features
+                    .map((f) => `<s-list-item>${f}</s-list-item>`)
+                    .join("")}
+                </s-unordered-list>
+                <div class="ss-cta-row">
+                  <s-button variant="${a.primary ? "primary" : "secondary"}"
+                    ${a.disabled ? "disabled" : ""}>${a.label}</s-button>
+                </div>
+              </s-stack>
+            </div>
+          </div>`;
+      }
+
+      function compareTable() {
+        const head = `<s-table-header-row>
+          <s-table-header listslot="primary">Feature</s-table-header>
+          ${PLANS.map((p) => `<s-table-header>${p.name}</s-table-header>`).join("")}
+        </s-table-header-row>`;
+        const body = ROWS.map(
+          ([key, label]) => `<s-table-row>
+            <s-table-cell>${label}</s-table-cell>
+            ${PLANS.map(
+              (p) =>
+                `<s-table-cell>${
+                  p.e[key]
+                    ? '<s-text tone="success" fontweight="semibold">✓</s-text>'
+                    : '<s-text color="subdued">—</s-text>'
+                }</s-table-cell>`,
+            ).join("")}
+          </s-table-row>`,
+        ).join("");
+        const trial = `<s-table-row>
+          <s-table-cell>Trial duration</s-table-cell>
+          ${PLANS.map(
+            () => '<s-table-cell><s-text tone="success">14-day free trial</s-text></s-table-cell>',
+          ).join("")}
+        </s-table-row>`;
+        return `
+          <s-table>
+            ${head}
+            <s-table-body>${body}${trial}</s-table-body>
+          </s-table>`;
+      }
+
+      function currentSection() {
+        if (!sub || (!sub.isActive && !sub.isPending)) return "";
+        const body = sub.isActive
+          ? `
+            <s-text color="subdued">Free trial ends ${sub.trialEndsAt} · next charge ${sub.currentPeriodEnd}</s-text>
+            <s-button tone="critical" variant="secondary">Cancel subscription</s-button>`
+          : `<s-text color="subdued">Shopify is waiting for you to approve this subscription. Complete the approval to activate your plan.</s-text>`;
+        return `
+          <s-section heading="Your subscription">
+            <s-stack direction="block" gap="base">
+              <s-stack direction="inline" gap="small" alignitems="center">
+                <s-text fontweight="semibold">${sub.planName}</s-text>
+                <s-badge tone="${sub.isActive ? "success" : "info"}">${
+                  sub.isActive ? "Active" : "Awaiting approval"
+                }</s-badge>
+              </s-stack>
+              <s-text color="subdued">${money(sub.price)} / month · billed monthly</s-text>
+              ${body}
+            </s-stack>
+          </s-section>`;
+      }
+
+      function banners() {
+        let html = "";
+        if (state === "pending") {
+          html += `<s-banner tone="info" heading="Approval pending">
+            You already have a subscription waiting for approval in Shopify. Complete that approval, or start a new one.
+          </s-banner>`;
+        }
+        if (state === "cancelled") {
+          html += `<s-banner tone="warning" heading="Your previous plan ended">
+            Your subscription was cancelled or expired. Start a new plan any time.
+          </s-banner>`;
+        }
+        return html;
+      }
+
+      function render() {
+        sub = SUBSCRIPTIONS[state];
+        const page = document.getElementById("page");
+        page.innerHTML = `
+          <s-page heading="Choose the Right Plan for Your Store">
+            <s-stack direction="block" gap="base">
+              <s-stack direction="block" gap="small">
+                <s-text color="subdued">Optimize your store performance with a plan that fits your business.</s-text>
+                <s-stack direction="inline" gap="small" alignitems="center">
+                  <s-badge tone="success">14-day free trial on every plan</s-badge>
+                  <s-badge tone="warning">Test mode</s-badge>
+                </s-stack>
+              </s-stack>
+              ${banners()}
+              ${currentSection()}
+              <s-grid gridtemplatecolumns="repeat(auto-fit, minmax(280px, 1fr))" gap="base">
+                ${PLANS.map(cardFor).join("")}
+              </s-grid>
+              <s-section heading="Compare plans">
+                <div class="ss-compare-scroll">${compareTable()}</div>
+              </s-section>
+              <s-text color="subdued" class="ss-note">Prices are in USD. Every plan includes a 14-day free trial, and billing is handled securely by Shopify. Your trial only starts once Shopify confirms the subscription.</s-text>
+            </s-stack>
+          </s-page>`;
+      }
+
+      document.querySelectorAll(".preview-bar button").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          state = btn.dataset.state;
+          document
+            .querySelectorAll(".preview-bar button")
+            .forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
+          render();
+        });
+      });
+
+      render();
+    </script>
+  </body>
+</html>

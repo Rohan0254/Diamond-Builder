@@ -1,0 +1,312 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
+// enough when changing adapters.
+// See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model Session {
+  session_id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  id                  String    @unique
+  shop                String
+  state               String
+  isOnline            Boolean   @default(false)
+  scope               String?
+  expires             DateTime?
+  accessToken         String
+  userId              BigInt?
+  firstName           String?
+  lastName            String?
+  email               String?
+  accountOwner        Boolean   @default(false)
+  locale              String?
+  collaborator        Boolean?  @default(false)
+  emailVerified       Boolean?  @default(false)
+  refreshToken        String?
+  refreshTokenExpires DateTime?
+}
+
+/// Local mirror of a Shopify app subscription. Never stores access tokens or
+/// payment details - only the plan/billing metadata needed to render the
+/// pricing page and enforce entitlements.
+model AppSubscription {
+  id                      String    @id @default(auto()) @map("_id") @db.ObjectId
+  shop                    String
+  planKey                 String
+  planName                String
+  price                   Float
+  currency                String    @default("USD")
+  billingInterval         String    @default("EVERY_30_DAYS")
+  trialDays               Int       @default(14)
+  trialEndsAt             DateTime?
+  currentPeriodEnd        DateTime?
+  status                  String    @default("PENDING")
+  shopifySubscriptionId   String?
+  test                    Boolean   @default(false)
+  confirmationInitiatedAt DateTime?
+  activatedAt             DateTime?
+  cancelledAt             DateTime?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  @@index([shop, status])
+  @@index([shopifySubscriptionId])
+}
+
+/// Latest script-verification result per shop (Setup page). `scripts` is a
+/// JSON array of `{ key, status, message }`; `overallStatus` is one of
+/// `complete | incomplete | unknown`. `shop` is always derived from the
+/// authenticated session, never from the client.
+model SetupVerification {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  shop           String
+  scripts        Json
+  overallStatus  String
+  lastVerifiedAt DateTime
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([shop, lastVerifiedAt])
+}
+
+/// A support request submitted through the Help page. `ticketId` is the
+/// human-friendly reference shown to the merchant (e.g. `SS-XXXXXX`); `shop`
+/// is always derived from the authenticated session, never from the client.
+model SupportTicket {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  ticketId  String   @unique
+  shop      String
+  name      String
+  email     String
+  message   String
+  status    String   @default("OPEN")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([shop, createdAt])
+  @@index([status])
+}
+
+/// One Google PageSpeed Insights run for one shop + device. `report` stores the
+/// normalized report model the dashboard renders (raw JSON + screenshot are
+/// stripped to keep documents small). `shop` is always derived from the
+/// authenticated session, never from the client.
+///
+/// `isBaseline` marks the automatic "before speed" capture taken at install (the
+/// fixed Before score). Dashboard "Before" loads only baseline-marked reports;
+/// "Current"/"after" loads the latest report that is not the baseline. Manual
+/// "Analyze now" runs and any later run are `false`.
+model PageSpeedReport {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  shop       String
+  device     String
+  url        String
+  report     Json
+  capturedAt DateTime
+  isBaseline Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([shop, device, capturedAt])
+  @@index([shop, device, isBaseline])
+}
+
+/// A PageSpeed analysis run started from the Dashboard. Clicking "Analyze now"
+/// creates one of these and returns immediately; the Google PageSpeed calls run
+/// in the background so a slow/timed-out API request never blocks the browser.
+/// The Dashboard polls this record until it reaches a terminal status, which
+/// also survives a page refresh. `status` is PENDING | RUNNING | COMPLETE |
+/// FAILED. `isBaseline` marks the automatic install-time "before speed" run, so
+/// every report it stores is the fixed Before score.
+/// `shop` is the myshopify domain from the authenticated session.
+model PageSpeedRun {
+  id         String    @id @default(auto()) @map("_id") @db.ObjectId
+  shop       String
+  status     String    @default("PENDING")
+  url        String?
+  devices    Json?
+  error      String?
+  isBaseline Boolean   @default(false)
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@index([shop, status])
+  @@index([shop, createdAt])
+}
+
+/// Platform script snippets. Each platform field holds that platform's script
+/// configuration as JSON (e.g. the code block the Setup page shows a merchant
+/// for that platform). `default` is the fallback used when no
+/// platform-specific entry applies. All platform fields are optional so a row
+/// can define only the platforms it needs.
+model Script {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  default     Json?
+  shopify     Json?
+  wix         Json?
+  bigcommerce Json?
+  webflow     Json?
+  custom      Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+/// Merchant / store profile captured when the app is installed (and refreshed
+/// periodically). All fields come from the Admin API `Shop` object — the
+/// merchant's own store business information, never customer data. `shop` is the
+/// myshopify domain derived from the authenticated session, never the client,
+/// and is the natural key. `raw` keeps the full GraphQL `shop` payload for
+/// future-proofing.
+model ShopProfile {
+  id                String   @id @default(auto()) @map("_id") @db.ObjectId
+  shop              String   @unique
+  shopifyShopId     String?
+  name              String?
+  shopOwnerName     String?
+  email             String?
+  contactEmail      String?
+  phone             String?
+  country           String?
+  countryCode       String?
+  province          String?
+  provinceCode      String?
+  city              String?
+  address1          String?
+  address2          String?
+  zip               String?
+  company           String?
+  storeUrl          String?
+  primaryDomain     String?
+  primaryDomainHost String?
+  myshopifyDomain   String?
+  currencyCode      String?
+  timezone          String?
+  plan              String?
+  shopifyPlus       Boolean?
+  partnerDevelopment Boolean?
+  raw               Json?
+  installedAt       DateTime @default(now())
+  lastSyncedAt      DateTime @default(now())
+  /// The generated per-shop script on BunnyCDN. `scriptCdnUrl` is the URL the
+  /// Setup page points the installed snippet at. Cached so the CDN is not
+  /// re-checked on every page load; `scriptGeneratedAt` records when it was
+  /// uploaded/reused.
+  scriptCdnUrl      String?
+  scriptGeneratedAt DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+/// A staff account for the super admin panel at `/admin`.
+///
+/// The panel lives outside the Shopify admin (its own URL, its own sign-in), so
+/// accounts are plain email + password. `passwordHash` stores a scrypt hash
+/// ("scrypt$N$r$p$salt$hash") and never the password itself. `role` is one of
+/// SUPER_ADMIN | ADMIN | SUPPORT | VIEWER (see `app/lib/admin/roles.js`).
+/// `active: false` disables an account without destroying the audit trail of who
+/// created or last used it.
+model StaffUser {
+  id           String    @id @default(auto()) @map("_id") @db.ObjectId
+  email        String    @unique
+  name         String
+  passwordHash String
+  role         String    @default("VIEWER")
+  active       Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdBy    String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([role])
+  @@index([active])
+}
+
+/// Current install state of a shop — one row per shop, keyed by the myshopify
+/// domain. Written by the `afterAuth` install hook and the `app/uninstalled`
+/// webhook so the super admin panel can list and filter shops without replaying
+/// the event history on every page load.
+///
+/// `installedAt` is the shop's first ever install (never reset) so the panel can
+/// show "customer since"; the event log records each cycle instead. `uninstalledAt`
+/// is set when the app is removed and cleared again on reinstall, and
+/// `reinstallCount` counts installs after the first — so a shop that leaves and
+/// comes back is visible at a glance. `redactedAt` marks the PII scrub performed
+/// by the `shop/redact` compliance webhook (see `app/shop-data.server.js`).
+model ShopInstallation {
+  id             String    @id @default(auto()) @map("_id") @db.ObjectId
+  shop           String    @unique
+  status         String    @default("INSTALLED")
+  name           String?
+  email          String?
+  domain         String?
+  shopifyShopId  String?
+  planKey        String?
+  installedAt    DateTime  @default(now())
+  uninstalledAt  DateTime?
+  reinstallCount Int       @default(0)
+  lastEventAt    DateTime  @default(now())
+  redactedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([status, lastEventAt])
+}
+
+/// Append-only install / reinstall / uninstall history for the super admin log
+/// view. Every lifecycle change appends one row; rows are never mutated, except
+/// for the PII scrub done by the `shop/redact` compliance webhook, which is what
+/// makes the log trustworthy. `type` is INSTALLED | REINSTALLED | UNINSTALLED.
+model ShopEvent {
+  id         String    @id @default(auto()) @map("_id") @db.ObjectId
+  shop       String
+  type       String
+  at         DateTime  @default(now())
+  name       String?
+  email      String?
+  domain     String?
+  detail     String?
+  redactedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([shop, at])
+  @@index([type, at])
+}
+
+/// Subscription plans (pricing tiers). This collection is the source of truth
+/// for the Plan page and for the price sent to Shopify's `appSubscriptionCreate`:
+/// edit a row (e.g. in MongoDB Atlas/Compass, or `npx prisma studio`) and the app
+/// uses the new value on the next request. Plans are global (not per-shop).
+///
+/// `key` is the stable identifier subscriptions are matched against — do not
+/// rename it once merchants are subscribed. `active` hides a plan from the
+/// pricing page without deleting it (existing subscribers keep working).
+/// `position` controls display order. `features` is a JSON array of strings and
+/// `entitlements` a JSON object of `{ [comparisonRowKey]: boolean }`.
+model Plan {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  key          String   @unique
+  name         String
+  price        Float
+  currency     String   @default("USD")
+  interval     String   @default("EVERY_30_DAYS")
+  trialDays    Int      @default(14)
+  description  String   @default("")
+  popular      Boolean  @default(false)
+  position     Int      @default(0)
+  active       Boolean  @default(true)
+  features     Json?
+  entitlements Json?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([position])
+}

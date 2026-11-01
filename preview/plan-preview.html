@@ -1,0 +1,647 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Speed Scratcher — Plan page preview</title>
+    <link rel="preconnect" href="https://cdn.shopify.com/" />
+    <link
+      rel="stylesheet"
+      href="https://cdn.shopify.com/static/fonts/inter/v4/styles.css"
+    />
+    <script src="https://cdn.shopify.com/shopifycloud/polaris.js"></script>
+    <style>
+      :root {
+        --green: #008060;
+        --green-weak: rgba(0, 128, 96, 0.12);
+        --text: #1a1a1a;
+        --subdued: #6d7175;
+        --border: #e1e3e5;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #f1f2f3;
+        color: var(--text);
+        font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          Roboto, sans-serif;
+      }
+      .preview-bar {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        padding: 12px 20px;
+        background: #1a1a1a;
+        color: #fff;
+      }
+      .preview-bar__label {
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+        opacity: 0.7;
+        margin-right: 4px;
+      }
+      .preview-bar button {
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        background: rgba(255, 255, 255, 0.08);
+        color: #fff;
+        font: inherit;
+        font-size: 13px;
+        padding: 6px 12px;
+        border-radius: 8px;
+        cursor: pointer;
+      }
+      .preview-bar button:hover {
+        background: rgba(255, 255, 255, 0.16);
+      }
+      .preview-bar button[aria-pressed="true"] {
+        background: var(--green);
+        border-color: var(--green);
+      }
+      .page {
+        max-width: 1120px;
+        margin: 0 auto;
+        padding: 28px 20px 64px;
+      }
+      .page-title {
+        margin: 0 0 4px;
+        font-size: 24px;
+        font-weight: 650;
+        letter-spacing: -0.01em;
+      }
+      .page-subtitle {
+        margin: 0 0 12px;
+        color: var(--subdued);
+        font-size: 14px;
+      }
+      .badges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        margin-bottom: 20px;
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        font-weight: 550;
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: #e3f1ec;
+        color: #0c6b52;
+      }
+      .badge--info {
+        background: #eaf4ff;
+        color: #0a4b8c;
+      }
+      .badge--warning {
+        background: #fff3e0;
+        color: #8a5a00;
+      }
+      .ss-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 16px;
+        align-items: stretch;
+      }
+      .ss-plan-card {
+        background: #ffffff;
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+        height: 100%;
+        transition: box-shadow 0.2s ease, transform 0.2s ease;
+      }
+      .ss-plan-card:hover {
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+        transform: translateY(-1px);
+      }
+      .ss-plan-card--popular {
+        border: 2px solid var(--green);
+        box-shadow: 0 8px 24px var(--green-weak);
+      }
+      .ss-plan-card__inner {
+        box-sizing: border-box;
+        padding: 22px;
+        height: 100%;
+      }
+      .ss-card-head {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+      .ss-card-title {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 650;
+      }
+      .ss-plan-price {
+        font-size: 34px;
+        font-weight: 650;
+        letter-spacing: -0.5px;
+      }
+      .ss-plan-price__suffix {
+        margin-left: 4px;
+        font-size: 14px;
+        color: var(--subdued);
+      }
+      .ss-card-desc {
+        margin: 6px 0 16px;
+        color: var(--subdued);
+        font-size: 14px;
+      }
+      .ss-features {
+        list-style: none;
+        margin: 16px 0 20px;
+        padding: 0;
+        display: grid;
+        gap: 10px;
+      }
+      .ss-features li {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        font-size: 14px;
+        line-height: 1.35;
+      }
+      .ss-check {
+        flex: none;
+        width: 18px;
+        height: 18px;
+        margin-top: 1px;
+        border-radius: 50%;
+        background: var(--green-weak);
+        color: var(--green);
+        font-size: 11px;
+        font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .ss-divider {
+        height: 1px;
+        background: var(--border);
+        margin: 4px 0;
+      }
+      .ss-cta {
+        margin-top: auto;
+      }
+      .ss-cta button {
+        width: 100%;
+        font: inherit;
+        font-size: 14px;
+        font-weight: 600;
+        padding: 11px 16px;
+        border-radius: 10px;
+        cursor: pointer;
+        border: 1px solid var(--border);
+        background: #fff;
+        color: var(--text);
+        transition: background 0.15s ease, box-shadow 0.15s ease;
+      }
+      .ss-cta button.primary {
+        background: var(--green);
+        border-color: var(--green);
+        color: #fff;
+      }
+      .ss-cta button.primary:hover {
+        background: #006e52;
+      }
+      .ss-cta button:disabled {
+        cursor: default;
+        opacity: 0.65;
+        background: #f1f2f3;
+        border-color: var(--border);
+        color: var(--subdued);
+      }
+      .ss-section {
+        background: #fff;
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 20px 22px;
+        margin-bottom: 20px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+      }
+      .ss-section h2 {
+        margin: 0 0 14px;
+        font-size: 16px;
+        font-weight: 650;
+      }
+      .ss-section--current {
+        border-left: 4px solid var(--green);
+        background: linear-gradient(0deg, #fff, #fff) padding-box,
+          linear-gradient(180deg, var(--green-weak), transparent) border-box;
+      }
+      .ss-banner {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        padding: 12px 16px;
+        border-radius: 12px;
+        font-size: 14px;
+        margin-bottom: 16px;
+        border: 1px solid transparent;
+      }
+      .ss-banner--warning {
+        background: #fff8e6;
+        border-color: #ffe0a3;
+        color: #5c3d00;
+      }
+      .ss-banner--info {
+        background: #eef6ff;
+        border-color: #cfe6ff;
+        color: #0a4b8c;
+      }
+      .ss-banner strong {
+        display: block;
+        margin-bottom: 2px;
+      }
+      .ss-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+      }
+      .ss-muted {
+        color: var(--subdued);
+        font-size: 14px;
+        margin: 4px 0;
+      }
+      .ss-compare-scroll {
+        max-width: 100%;
+        overflow-x: auto;
+      }
+      .ss-compare {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 520px;
+        font-size: 14px;
+      }
+      .ss-compare th,
+      .ss-compare td {
+        text-align: left;
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--border);
+        white-space: nowrap;
+      }
+      .ss-compare th {
+        font-weight: 600;
+        color: var(--subdued);
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+      }
+      .ss-compare tr:last-child td {
+        border-bottom: none;
+      }
+      .ss-compare td.yes {
+        color: var(--green);
+        font-weight: 700;
+      }
+      .ss-compare td.no {
+        color: #b5b5b5;
+      }
+      .ss-footnote {
+        color: var(--subdued);
+        font-size: 12.5px;
+        margin-top: 20px;
+        line-height: 1.5;
+      }
+      .ss-retry {
+        font: inherit;
+        font-size: 13px;
+        padding: 7px 14px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: #fff;
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="preview-bar">
+      <span class="preview-bar__label">Preview state</span>
+      <button data-state="new" aria-pressed="true">New customer</button>
+      <button data-state="active" aria-pressed="false">Active · Pro</button>
+      <button data-state="pending" aria-pressed="false">Pending · Pro</button>
+      <button data-state="cancelled" aria-pressed="false">Cancelled</button>
+    </div>
+
+    <div class="page">
+      <h1 class="page-title">Choose the Right Plan for Your Store</h1>
+      <p class="page-subtitle">
+        Optimize your store performance with a plan that fits your business.
+      </p>
+      <div class="badges">
+        <span class="badge">✓ 14-day free trial on every plan</span>
+        <span class="badge badge--warning" id="testModeBadge" hidden
+          >Test mode</span
+        >
+      </div>
+
+      <div id="banners"></div>
+      <div id="current"></div>
+      <div class="ss-grid" id="cards"></div>
+
+      <div class="ss-section" style="margin-top: 20px">
+        <h2>Compare plans</h2>
+        <div class="ss-compare-scroll">
+          <table class="ss-compare" id="compare"></table>
+        </div>
+      </div>
+
+      <p class="ss-footnote">
+        Prices are in USD. Every plan includes a 14-day free trial, and billing
+        is handled securely by Shopify. Your trial only starts once Shopify
+        confirms the subscription.
+      </p>
+    </div>
+
+    <script>
+      // Mirrors app/lib/plans.js
+      const PLANS = [
+        {
+          key: "basic",
+          name: "Basic",
+          price: 9.99,
+          description: "Perfect for growing stores",
+          popular: false,
+          features: [
+            "Automatic speed optimization",
+            "Image compression",
+            "Lazy-load optimization",
+            "Basic analytics",
+            "Email support",
+          ],
+          e: {
+            speedOptimization: true,
+            imageCompression: true,
+            lazyLoad: true,
+            coreWebVitals: false,
+            jsCssOptimization: false,
+            performanceRecommendations: false,
+            customRules: false,
+            advancedAnalytics: false,
+            prioritySupport: false,
+            dedicatedSupport: false,
+          },
+        },
+        {
+          key: "pro",
+          name: "Pro",
+          price: 19.99,
+          description: "Best for established stores",
+          popular: true,
+          features: [
+            "All Basic features",
+            "Advanced speed optimization",
+            "Core Web Vitals improvements",
+            "JavaScript and CSS optimization",
+            "Performance recommendations",
+            "Priority support",
+          ],
+          e: {
+            speedOptimization: true,
+            imageCompression: true,
+            lazyLoad: true,
+            coreWebVitals: true,
+            jsCssOptimization: true,
+            performanceRecommendations: true,
+            customRules: false,
+            advancedAnalytics: false,
+            prioritySupport: true,
+            dedicatedSupport: false,
+          },
+        },
+        {
+          key: "advanced",
+          name: "Advanced",
+          price: 39.99,
+          description: "For high-volume stores",
+          popular: false,
+          features: [
+            "All Pro features",
+            "Advanced caching and optimization",
+            "Custom optimization rules",
+            "Advanced performance analytics",
+            "Dedicated performance support",
+          ],
+          e: {
+            speedOptimization: true,
+            imageCompression: true,
+            lazyLoad: true,
+            coreWebVitals: true,
+            jsCssOptimization: true,
+            performanceRecommendations: true,
+            customRules: true,
+            advancedAnalytics: true,
+            prioritySupport: true,
+            dedicatedSupport: true,
+          },
+        },
+      ];
+
+      const ROWS = [
+        ["speedOptimization", "Automatic speed optimization"],
+        ["imageCompression", "Image compression"],
+        ["lazyLoad", "Lazy-load optimization"],
+        ["coreWebVitals", "Core Web Vitals improvements"],
+        ["jsCssOptimization", "JavaScript and CSS optimization"],
+        ["performanceRecommendations", "Performance recommendations"],
+        ["customRules", "Custom optimization rules"],
+        ["advancedAnalytics", "Advanced analytics"],
+        ["prioritySupport", "Priority support"],
+        ["dedicatedSupport", "Dedicated performance support"],
+      ];
+
+      const money = (n) => "$" + n.toFixed(2);
+
+      const SUBSCRIPTIONS = {
+        new: null,
+        active: {
+          planKey: "pro",
+          planName: "Pro",
+          status: "ACTIVE",
+          isActive: true,
+          isPending: false,
+          price: 19.99,
+          trialEndsAt: "2026-10-24",
+          currentPeriodEnd: "2026-11-09",
+        },
+        pending: {
+          planKey: "pro",
+          planName: "Pro",
+          status: "PENDING",
+          isActive: false,
+          isPending: true,
+          price: 19.99,
+        },
+        cancelled: null,
+      };
+
+      let state = "new";
+      let sub = null;
+
+      function actionFor(plan) {
+        if (!sub) {
+          return {
+            label: "Start 14-day free trial",
+            disabled: false,
+            primary: plan.popular,
+          };
+        }
+        if (sub.isActive) {
+          if (sub.planKey === plan.key)
+            return { label: "Your current plan", disabled: true, primary: false };
+          return {
+            label: `Switch to ${plan.name}`,
+            disabled: false,
+            primary: plan.popular,
+          };
+        }
+        if (sub.isPending) {
+          if (sub.planKey === plan.key)
+            return { label: "Awaiting approval", disabled: true, primary: false };
+          return { label: "Pending approval", disabled: true, primary: false };
+        }
+        return {
+          label: "Start 14-day free trial",
+          disabled: false,
+          primary: plan.popular,
+        };
+      }
+
+      function renderCards() {
+        document.getElementById("cards").innerHTML = PLANS.map((plan) => {
+          const a = actionFor(plan);
+          const badges = [];
+          if (plan.popular)
+            badges.push('<span class="badge">Most Popular</span>');
+          if (sub && sub.isActive && sub.planKey === plan.key)
+            badges.push('<span class="badge">Current plan</span>');
+          if (sub && sub.isPending && sub.planKey === plan.key)
+            badges.push('<span class="badge badge--info">Awaiting approval</span>');
+          return `
+            <div class="ss-plan-card ${plan.popular ? "ss-plan-card--popular" : ""}">
+              <div class="ss-plan-card__inner" style="display:flex;flex-direction:column">
+                <div class="ss-card-head">
+                  <h3 class="ss-card-title">${plan.name}</h3>
+                  ${badges.join("")}
+                </div>
+                <div>
+                  <span class="ss-plan-price">${money(plan.price)}</span>
+                  <span class="ss-plan-price__suffix">/month</span>
+                </div>
+                <p class="ss-card-desc">${plan.description}</p>
+                <div class="ss-divider"></div>
+                <ul class="ss-features">
+                  ${plan.features
+                    .map(
+                      (f) =>
+                        `<li><span class="ss-check">✓</span><span>${f}</span></li>`,
+                    )
+                    .join("")}
+                </ul>
+                <div class="ss-cta">
+                  <button class="${a.primary ? "primary" : ""}" ${
+                    a.disabled ? "disabled" : ""
+                  }>${a.label}</button>
+                </div>
+              </div>
+            </div>`;
+        }).join("");
+      }
+
+      function renderCompare() {
+        const head = `<tr><th>Feature</th>${PLANS.map(
+          (p) => `<th>${p.name}</th>`,
+        ).join("")}</tr>`;
+        const body = ROWS.map(([key, label]) => {
+          const cells = PLANS.map(
+            (p) =>
+              `<td class="${p.e[key] ? "yes" : "no"}">${
+                p.e[key] ? "✓" : "—"
+              }</td>`,
+          ).join("");
+          return `<tr><td>${label}</td>${cells}</tr>`;
+        }).join("");
+        const trial = `<tr><td>Trial duration</td>${PLANS.map(
+          () => `<td class="yes">14-day free trial</td>`,
+        ).join("")}</tr>`;
+        document.getElementById("compare").innerHTML = head + body + trial;
+      }
+
+      function renderCurrent() {
+        const el = document.getElementById("current");
+        if (!sub || (!sub.isActive && !sub.isPending)) {
+          el.innerHTML = "";
+          return;
+        }
+        const rows = sub.isActive
+          ? `<p class="ss-muted">Free trial ends ${sub.trialEndsAt} · next charge ${sub.currentPeriodEnd}</p>
+             <div class="ss-row"><button class="ss-retry">Cancel subscription</button></div>`
+          : `<p class="ss-muted">Shopify is waiting for you to approve this subscription. Complete the approval to activate your plan.</p>`;
+        el.innerHTML = `
+          <div class="ss-section ss-section--current">
+            <div class="ss-row" style="margin-bottom:8px">
+              <strong>${sub.planName}</strong>
+              <span class="badge ${sub.isActive ? "" : "badge--info"}">${
+                sub.isActive ? "Active" : "Awaiting approval"
+              }</span>
+            </div>
+            <p class="ss-muted">${money(sub.price)} / month · billed monthly</p>
+            ${rows}
+          </div>`;
+      }
+
+      function renderBanners() {
+        const el = document.getElementById("banners");
+        let html = "";
+        if (state === "pending") {
+          html += `<div class="ss-banner ss-banner--info">
+            <div><strong>Approval pending</strong>You already have a subscription waiting for approval in Shopify. Complete that approval, or start a new one.
+            <div style="margin-top:10px"><button class="ss-retry">Retry</button></div></div>
+          </div>`;
+        }
+        if (state === "cancelled") {
+          html += `<div class="ss-banner ss-banner--warning">
+            <div><strong>Your previous plan ended</strong>Your subscription was cancelled or expired. Start a new plan any time.</div>
+          </div>`;
+        }
+        el.innerHTML = html;
+      }
+
+      function render() {
+        sub = SUBSCRIPTIONS[state];
+        renderBanners();
+        renderCurrent();
+        renderCards();
+        renderCompare();
+      }
+
+      document.querySelectorAll(".preview-bar button").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          state = btn.dataset.state;
+          document
+            .querySelectorAll(".preview-bar button")
+            .forEach((b) =>
+              b.setAttribute("aria-pressed", String(b === btn)),
+            );
+          render();
+        });
+      });
+
+      render();
+    </script>
+  </body>
+</html>
