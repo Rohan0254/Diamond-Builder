@@ -16,7 +16,6 @@ import {
   syncSubscriptionFromChargeId,
 } from "../billing.server";
 import { ensureShopProfile } from "../shop-profile.server";
-import { ensureBaselinePageSpeedRun } from "../pagespeed.server";
 import { getLatestSetupVerification } from "../setup.server";
 import { isTerminalStatus } from "../lib/billing";
 import NavLoadingShimmer from "../components/NavLoadingShimmer.jsx";
@@ -25,9 +24,6 @@ import { SHELL_CSS } from "../lib/shell-styles.js";
 // Pages a shop can reach before it has selected a plan.
 const NO_PLAN_PATHS = new Set(["/app/plan", "/app/help"]);
 
-// Pages that need the one-time Setup step done first: the Dashboard and the
-// report pages it links to (performance details + the SEO audit).
-const SETUP_GATED_PATHS = new Set(["/app", "/app/report", "/app/seo"]);
 
 /**
  * Removes the one-shot `charge_id` Shopify appends to a billing return URL so a
@@ -86,15 +82,6 @@ export const loader = async ({ request }) => {
     console.error("Failed to sync shop profile", error);
   }
 
-  // Kick off the automatic "before speed" baseline run on first load if the
-  // install hook missed it (e.g. shops installed before this feature). No-op
-  // once a report exists or a run has already been created. Best-effort.
-  try {
-    await ensureBaselinePageSpeedRun({ shop: session.shop, admin });
-  } catch (error) {
-    console.error("Failed to ensure baseline PageSpeed run", error);
-  }
-
   const status = subscription?.status ?? null;
   // A plan counts as "taken" as soon as a pending or active subscription exists.
   // Only declined/cancelled/expired records fall back to the two-tab state.
@@ -118,7 +105,7 @@ export const loader = async ({ request }) => {
     }
   }
 
-  if (hasPlan && !setupComplete && SETUP_GATED_PATHS.has(pathname)) {
+  if (hasPlan && !setupComplete && pathname === "/app") {
     throw redirect(`/app/setup${url.search}`);
   }
 
@@ -260,7 +247,7 @@ export default function App() {
       hasPlan &&
       location.pathname !== "/app/setup" &&
       (returningFromApproval ||
-        (SETUP_GATED_PATHS.has(location.pathname) && !setupComplete));
+        (location.pathname === "/app" && !setupComplete));
     if (shouldSetup) {
       navigate("/app/setup", { replace: true });
     }

@@ -1,4 +1,4 @@
-// Server-side support ticketing for Speed Scratcher (Help page).
+// Server-side support ticketing for Diamond Builder (Help page).
 //
 // Responsibilities:
 //   - validate submissions server-side (re-validating what the client checks),

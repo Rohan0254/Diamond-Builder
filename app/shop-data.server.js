@@ -11,12 +11,8 @@
 //   AppSubscription    — the local billing mirror (no tokens or payment data)
 //   ShopProfile        — the merchant's own store info from the Admin API
 //   SetupVerification  — the latest script-verification snapshot
-//   PageSpeedReport    — every PageSpeed report measured for the shop
-//   PageSpeedRun       — every analysis run (pending, running or finished)
 //   SupportTicket      — support requests the merchant submitted in the app
 //
-// `Script` rows hold global platform snippets, not shop data, so they are left
-// alone.
 
 import prisma from "./db.server";
 
@@ -45,8 +41,6 @@ export async function redactShopData(shop) {
     ["appSubscription", prisma.appSubscription],
     ["shopProfile", prisma.shopProfile],
     ["setupVerification", prisma.setupVerification],
-    ["pageSpeedReport", prisma.pageSpeedReport],
-    ["pageSpeedRun", prisma.pageSpeedRun],
     ["supportTicket", prisma.supportTicket],
   ];
 

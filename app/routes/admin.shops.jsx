@@ -24,7 +24,7 @@ import {
 // bookmarked or shared.
 
 export const meta = () => [
-  { title: "Installed apps · Speed Scratcher Super Admin" },
+  { title: "Installed apps · Diamond Builder Super Admin" },
 ];
 
 const PAGE_SIZE = 25;

@@ -32,7 +32,7 @@ import {
   validateStaffUpdate,
 } from "./lib/admin/staff";
 
-export const ADMIN_COOKIE_NAME = "__ss_admin";
+export const ADMIN_COOKIE_NAME = "__ss_admin_v2";
 export const ADMIN_SESSION_MAX_AGE_SECONDS = 60 * 60 * 8; // 8 hours
 
 /**
@@ -53,7 +53,8 @@ export function createAdminSessionStorage(env = process.env) {
     cookie: {
       name: ADMIN_COOKIE_NAME,
       httpOnly: true,
-      path: "/admin",
+      // Dashboard navigation fetches /admin.data, outside the /admin cookie path.
+      path: "/",
       sameSite: "lax",
       secrets: [sessionSecret(env)],
       secure: env.NODE_ENV === "production",

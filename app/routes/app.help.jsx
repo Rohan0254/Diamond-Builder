@@ -45,7 +45,7 @@ function ContactForm() {
       setLastResult({
         tone: "success",
         heading: "Message sent successfully!",
-        detail: "Thank you for contacting Speed Scratcher Support. Your request has been received.",
+        detail: "Thank you for contacting Diamond Builder Support. Your request has been received.",
         ticketId: data.ticketId,
         notified: data.notified,
       });
@@ -356,7 +356,7 @@ export default function HelpPage() {
 
       <s-stack direction="block" gap="base">
         <s-text color="subdued">
-          Need assistance with Speed Scratcher? Send us a message or find
+          Need assistance with Diamond Builder? Send us a message or find
           answers to common questions below.
         </s-text>
 
@@ -372,7 +372,7 @@ export default function HelpPage() {
           <s-stack direction="block" gap="small">
             <s-text color="subdued">
               Find quick answers to common questions about setting up and using
-              Speed Scratcher.
+              Diamond Builder.
             </s-text>
             <FaqAccordion items={faqItems} />
           </s-stack>

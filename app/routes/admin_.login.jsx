@@ -102,7 +102,7 @@ export default function AdminLogin() {
         <div className="sa-login__brand">
           <span className="sa-brand__mark">SS</span>
           <span className="sa-brand__text">
-            <span className="sa-brand__title">Speed Scratcher</span>
+            <span className="sa-brand__title">Diamond Builder</span>
             <span className="sa-brand__subtitle">Super admin</span>
           </span>
         </div>

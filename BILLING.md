@@ -1,4 +1,4 @@
-# Speed Scratcher — Subscription Billing
+# Diamond Builder — Subscription Billing
 
 Internal notes for the Shopify app subscription flow behind the **Plan** tab
 (`/app/plan`). See `PROJECT.md` for the overall project and `AGENTS.md` for
@@ -69,14 +69,6 @@ The shell loader (`app/routes/app.jsx`) gates the navigation on billing state:
   paying.
 - The Setup page has a **Go to Dashboard** button (disabled until the script is
   verified) that navigates to `/app`.
-- **Automatic "before speed" run**: on install (`afterAuth`) — and on any app
-  load if it was missed — the server starts a background PageSpeed run for the
-  store, before the app's script is installed, so the baseline is captured
-  without the merchant acting. Until it finishes, Setup hides the script and
-  shows a "we're generating the script for your store" loader, and the Dashboard
-  shows a loader instead of data. Both poll `/pagespeed-status` and reveal the
-  real content when the run completes. See `DEPLOYING.md` for details.
-
 ## Plans & pricing (managed in the database)
 
 The `Plan` collection (MongoDB) is the source of truth for the pricing page and

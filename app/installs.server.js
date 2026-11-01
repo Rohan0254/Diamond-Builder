@@ -225,7 +225,7 @@ export async function getInstallStats({ now = new Date() } = {}) {
       },
     }),
     prisma.shopEvent.count({
-      where: { type: SHOP_EVENT_TYPE.UNINSTALLED, at: { gte: now.getTime() - 6048e5 } },
+      where: { type: SHOP_EVENT_TYPE.UNINSTALLED, at: { gte: weekAgo } },
     }),
     prisma.shopInstallation.count({ where: { reinstallCount: { gt: 0 } } }),
   ]);

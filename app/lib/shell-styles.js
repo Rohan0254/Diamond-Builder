@@ -1,15 +1,5 @@
 // Shell-level styles for `app/routes/app.jsx`.
 //
-// This app keeps its CSS as exported strings rather than .css files (see
-// `app/lib/report/styles.js`), so the shell follows the same pattern and drops
-// the string into a <style> tag.
-//
-// What this covers: the loading shimmer. Some pages here read the store, run a
-// PageSpeed lookup or hit Shopify before they can render, so a button or a nav
-// link can sit for a moment with nothing visibly happening. Rather than washing
-// the whole page, the control that was clicked shimmers in place: a soft blue
-// wash with a highlight sweeping across it. `NavLoadingShimmer` draws the box;
-// these rules make it look like the control itself is working.
 
 export const SHELL_CSS = `
   /* Fixed to the control's own box, so it reads as part of the button/link.

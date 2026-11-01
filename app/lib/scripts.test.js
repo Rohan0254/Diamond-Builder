@@ -5,7 +5,6 @@ import {
   SCRIPT_KEYS,
   SCRIPT_MARKERS,
   SCRIPT_META,
-  buildCdnInstallScript,
   buildScriptDefinition,
   buildScriptDefinitions,
   extractScriptSrc,
@@ -69,14 +68,6 @@ test("the copyable script does not embed the install instruction comment", () =>
   })[0].script;
   assert.ok(!configured.includes("<!-- Install"));
   assert.ok(!configured.includes("theme.liquid"));
-
-  const dynamic = buildCdnInstallScript({
-    cdnUrl: "https://cdn.test/scripts/x/scrachar_x.js",
-    userId: "x",
-    websiteId: "x",
-  });
-  assert.ok(!dynamic.includes("<!-- Install"));
-  assert.ok(!dynamic.includes("theme.liquid"));
 });
 
 test("getPublicScripts returns the raw copyable text without UI labels or errors", () => {
@@ -96,44 +87,11 @@ test("getPublicScripts returns the raw copyable text without UI labels or errors
   );
 });
 
-test("buildCdnInstallScript points at the CDN URL and keeps the marker + data attributes", () => {
-  const script = buildCdnInstallScript({
-    cdnUrl: "https://speed.b-cdn.net/scripts/abc/scrachar_abc.js",
-    userId: "abc",
-    websiteId: "abc",
-    platform: "Shopify",
-  });
-  assert.ok(
-    script.includes(
-      'src="https://speed.b-cdn.net/scripts/abc/scrachar_abc.js"',
-    ),
-  );
-  assert.ok(script.includes(SCRIPT_MARKERS["storefront-optimization"]));
-  assert.ok(script.includes('data-user-id="abc"'));
-  assert.ok(script.includes('data-platform="Shopify"'));
-  assert.ok(script.includes('data-website-id="abc"'));
-  // A CDN-backed script must never carry the placeholder note.
-  assert.ok(!script.includes("PLACEHOLDER"));
-});
-
-test("buildCdnInstallScript escapes attribute values", () => {
-  const script = buildCdnInstallScript({
-    cdnUrl: 'https://cdn.test/a.js"onload="alert(1)',
-    userId: 'x" y',
-  });
-  assert.ok(!script.includes('"onload="alert(1)'));
-  assert.ok(script.includes("&quot;"));
-});
-
 test("extractScriptSrc reads the src URL from a rendered script block", () => {
-  const script = buildCdnInstallScript({
-    cdnUrl: "https://speed.b-cdn.net/scripts/abc/scrachar_abc.js",
-    userId: "abc",
-    websiteId: "abc",
-  });
+  const script = buildScriptDefinitions({ optimizationUrl: "https://example.test/script.js" })[0].script;
   assert.equal(
     extractScriptSrc(script),
-    "https://speed.b-cdn.net/scripts/abc/scrachar_abc.js",
+    "https://example.test/script.js",
   );
   // The unconfigured placeholder has no src.
   const placeholder = buildScriptDefinitions({ optimizationUrl: "" })[0].script;

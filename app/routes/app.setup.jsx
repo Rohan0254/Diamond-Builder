@@ -4,24 +4,17 @@ import {
   useLoaderData,
   useNavigate,
   useNavigation,
-  useRevalidator,
 } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { authenticateAdminOrDiagnose } from "../shopify.server";
 import {
   canVerifyNow,
-  getSetupScripts,
+  getScriptDefinitions,
   getLatestSetupVerification,
   runSetupVerification,
   serializeSetupVerification,
 } from "../setup.server";
-import {
-  ensureBaselinePageSpeedRun,
-  getRunState,
-  hasStoredReport,
-  startPageSpeedRun,
-} from "../pagespeed.server";
 import { overallStatusLabel } from "../lib/verify";
 /* eslint-disable react/prop-types -- plain JS internal components, not a public API */
 
@@ -218,8 +211,6 @@ export const loader = async ({ request }) => {
     return {
       scripts: [],
       setup: null,
-      run: null,
-      beforeSpeedReady: false,
       authError: auth.error,
     };
   }
@@ -234,39 +225,9 @@ export const loader = async ({ request }) => {
     console.error("Failed to load latest setup verification", error);
   }
 
-  // The automatic "before speed" run is kicked off at install. Ensure it here
-  // too, then read its status, so Verify can be gated on the before score
-  // actually existing (the merchant must not verify before we have a baseline).
-  try {
-    await ensureBaselinePageSpeedRun({
-      shop: session.shop,
-      admin: auth.context.admin,
-    });
-  } catch (error) {
-    console.error("[setup.loader] failed to ensure the baseline run", error);
-  }
-
-  let run = null;
-  try {
-    run = await getRunState(session.shop);
-  } catch (error) {
-    console.error("[setup.loader] failed to load run state", error);
-  }
-  let beforeSpeedReady = false;
-  try {
-    beforeSpeedReady = await hasStoredReport(session.shop);
-  } catch (error) {
-    console.error("[setup.loader] failed to check the baseline report", error);
-  }
-
   return {
-    scripts: await getSetupScripts({
-      shop: session.shop,
-      admin: auth.context.admin,
-    }),
+    scripts: getScriptDefinitions(),
     setup,
-    run,
-    beforeSpeedReady,
     authError: null,
   };
 };
@@ -280,28 +241,6 @@ export const action = async ({ request }) => {
 
   const form = await request.formData();
   const intent = String(form.get("intent") ?? "");
-
-  // Recover a shop whose automatic "before speed" capture never completed (for
-  // example it failed, or the API key was only added later). Verify stays locked
-  // until a before score exists, so the merchant needs a way to start it.
-  if (intent === "capture-baseline") {
-    try {
-      const result = await startPageSpeedRun({
-        shop: session.shop,
-        admin: auth.context.admin,
-        isBaseline: true,
-      });
-      return result.ok
-        ? { ok: true, captured: true, run: result.run ?? null }
-        : { ok: false, error: result.error };
-    } catch (error) {
-      console.error("[setup.action] baseline capture failed", error);
-      return {
-        ok: false,
-        error: "We could not start the speed test. Please try again in a moment.",
-      };
-    }
-  }
 
   if (intent !== "verify") {
     return { ok: false, error: "Unsupported action." };
@@ -332,21 +271,6 @@ export const action = async ({ request }) => {
     return { ok: false, error: result.error };
   }
 
-  // The store is now "after" the change, so capture the current speed in the
-  // background — this fills the dashboard's Before/After comparison without the
-  // merchant having to click "Analyze now". Best-effort: never fail the
-  // verification if the run cannot start (cooldown, API hiccup, …).
-  if (result.setup?.overallStatus === "complete") {
-    try {
-      await startPageSpeedRun({
-        shop: session.shop,
-        admin: auth.context.admin,
-      });
-    } catch (error) {
-      console.error("[setup.action] failed to start the current-score run", error);
-    }
-  }
-
   return { ok: true, setup: result.setup, sources: result.sources };
 };
 
@@ -368,12 +292,8 @@ export default function SetupPage() {
     scripts,
     setup,
     authError,
-    run: initialRun,
-    beforeSpeedReady,
   } = useLoaderData();
   const fetcher = useFetcher();
-  const statusFetcher = useFetcher();
-  const revalidator = useRevalidator();
   const navigation = useNavigation();
   const shopify = useAppBridge();
   const navigate = useNavigate();
@@ -383,21 +303,6 @@ export default function SetupPage() {
   const verification = fetcher.data?.setup ?? setup;
   const badge = statusBadge(verification?.overallStatus);
   const isVerified = verification?.overallStatus === "complete";
-
-  // The freshest run state: the polled value once it has loaded, else the
-  // loader's value (which keeps a refresh mid-run polling).
-  const polledRun = statusFetcher.data ? statusFetcher.data.run : undefined;
-  const run = polledRun === undefined ? initialRun : polledRun;
-  const activeRun = Boolean(
-    run && (run.status === "PENDING" || run.status === "RUNNING"),
-  );
-  // The automatic "before speed" capture. The merchant must not verify before we
-  // have a before score, so Verify Setup stays disabled until `baselineReady`.
-  const baselineReady = beforeSpeedReady;
-  const fetchingScore = !baselineReady && activeRun;
-  const needsScore = !baselineReady && !activeRun;
-
-  const seenActiveRuns = useRef(new Set());
 
   useEffect(() => {
     shopify.loading(isRunning || isNavigating);
@@ -409,38 +314,8 @@ export default function SetupPage() {
     }
   }, [fetcher.data, shopify]);
 
-  // The capture was just started from this page — read its status right away so
-  // the poller below starts without waiting for the next interval.
-  useEffect(() => {
-    if (fetcher.data?.captured) statusFetcher.load("/pagespeed-status");
-  }, [fetcher.data, statusFetcher]);
-
-  // Poll the lightweight status endpoint while the before score is being captured.
-  useEffect(() => {
-    if (!fetchingScore) return undefined;
-    const id = setInterval(() => {
-      statusFetcher.load("/pagespeed-status");
-    }, 4000);
-    return () => clearInterval(id);
-  }, [fetchingScore, statusFetcher]);
-
-  // When the baseline run finishes, pull fresh loader data — that flips
-  // `beforeSpeedReady` and unlocks Verify Setup.
-  useEffect(() => {
-    if (!run) return;
-    if (activeRun) {
-      seenActiveRuns.current.add(run.id);
-      return;
-    }
-    if (!seenActiveRuns.current.has(run.id)) return;
-    seenActiveRuns.current.delete(run.id);
-    revalidator.revalidate();
-  }, [run, activeRun, revalidator]);
-
   const notify = (message, options) => shopify.toast.show(message, options);
   const runVerify = () => fetcher.submit({ intent: "verify" }, { method: "POST" });
-  const captureBaseline = () =>
-    fetcher.submit({ intent: "capture-baseline" }, { method: "POST" });
 
   return (
     <s-page heading="Setup" inlinesize="base">
@@ -502,46 +377,10 @@ export default function SetupPage() {
       <s-stack direction="block" gap="base">
         {isVerified && (
           <s-banner tone="success" heading="Setup completed successfully!">
-            <s-text>Speed Scratcher is configured for your store.</s-text>
+            <s-text>Diamond Builder is configured for your store.</s-text>
           </s-banner>
         )}
 
-        {fetchingScore && (
-          <s-banner tone="info" heading="We're fetching your current website speed">
-            <s-stack direction="inline" gap="small" alignItems="center">
-              <s-spinner
-                size="base"
-                accessibilityLabel="Fetching your current website speed"
-              />
-              <s-text>
-                We&apos;re capturing your store&apos;s before score. Verify Setup
-                stays disabled until it&apos;s ready — this usually takes less
-                than a minute, and the page updates automatically.
-              </s-text>
-            </s-stack>
-          </s-banner>
-        )}
-
-        {needsScore && (
-          <s-banner tone="warning" heading="Your before score isn't ready yet">
-            <s-stack direction="block" gap="base">
-              <s-text>
-                We couldn&apos;t capture your store&apos;s current speed
-                automatically. Verify Setup stays disabled until we have a before
-                score to compare against.
-              </s-text>
-              <s-stack direction="inline">
-                <s-button
-                  onClick={captureBaseline}
-                  loading={isRunning}
-                  disabled={isRunning}
-                >
-                  Fetch my store&apos;s speed
-                </s-button>
-              </s-stack>
-            </s-stack>
-          </s-banner>
-        )}
 
         <s-stack direction="block" gap="small">
           <s-text color="subdued">
@@ -575,7 +414,7 @@ export default function SetupPage() {
             <s-button
               variant="primary"
               loading={isRunning}
-              disabled={isRunning || !baselineReady}
+              disabled={isRunning}
               onClick={runVerify}
             >
               {isRunning ? "Verifying…" : "Verify Setup"}
@@ -590,9 +429,7 @@ export default function SetupPage() {
             </s-button>
           </s-stack>
           <s-text color="subdued">
-            {!baselineReady
-              ? "Verify Setup unlocks once we've captured your before score."
-              : isVerified
+            {isVerified
                 ? "You can come back to this Setup page anytime from the menu."
                 : "Verify your setup to unlock the dashboard."}
           </s-text>

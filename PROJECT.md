@@ -1,10 +1,10 @@
-# Speed Scratcher — Working Notes
+# Diamond Builder — Working Notes
 
 Short reference so sessions can skip re-exploring. Details live in `README.md`; Shopify rules in `AGENTS.md`.
 
 ## What it is
 
-Embedded Shopify app **"Speed Scratcher"**, scaffolded from `shopify-app-template-react-router`. Still mostly template code — no custom app features built yet.
+Embedded Shopify app **"Diamond Builder"**, scaffolded from `shopify-app-template-react-router`. Still mostly template code — no custom app features built yet.
 
 ## Stack
 

@@ -4,7 +4,7 @@ Everything here is the checklist for running the next build on
 `webspeedy.onrender.com`. The app uses Prisma 6 against MongoDB, and Shopify
 App Bridge for the embedded admin UI — both are unforgiving about environment
 setup. A misconfigured host shows up as `500 Unexpected Server Error` on the
-authenticated data requests, exactly what `https://speed-scratchers.onrender.com/app/plan.data`
+authenticated data requests, exactly what `https://diamond-builder.onrender.com/app/plan.data`
 was returning.
 
 ## Why the plan page 500s
@@ -81,19 +81,10 @@ yet every authenticated request 500s) is:
 | `SHOPIFY_API_KEY` | The app's API key (already set — the App Bridge script on the deployed pages shows a non-empty key). |
 | `SHOPIFY_API_SECRET` | The app's API secret. Session-token verification falls back to a reauthorize flow when this is wrong, so a bad value here causes redirect loops rather than a 500 — but set it anyway. |
 | `SCOPES` | e.g. `read_themes,write_products,write_metaobjects,write_metaobject_definitions` — must match what the app requested at install. `read_themes` powers Setup verification. |
-| `SHOPIFY_APP_URL` | `https://speed-scratchers.onrender.com` — used as the OAuth/app base. The billing `returnUrl` is built from `SHOPIFY_API_KEY` + the shop as the **Shopify admin** URL (`https://admin.shopify.com/store/<shop>/apps/<apiKey>`), not from this value. |
+| `SHOPIFY_APP_URL` | `https://diamond-builder.onrender.com` — used as the OAuth/app base. The billing `returnUrl` is built from `SHOPIFY_API_KEY` + the shop as the **Shopify admin** URL (`https://admin.shopify.com/store/<shop>/apps/<apiKey>`), not from this value. |
 | `BILLING_TEST_MODE` | Set to `true` unless you've created real plans for the app. Billing runs in test mode by default. |
 | `PORT` | Render sets this automatically; `react-router-serve` binds to it. |
-| `SPEED_SCRATCHER_OPTIMIZATION_SCRIPT_URL` | **Optional fallback.** The static storefront optimization script URL, used only when BunnyCDN is **not** configured. When unset the Setup page shows a clearly-marked placeholder block that loads nothing (no invented endpoints are ever emitted). |
-| `BUNNY_API_KEY` | BunnyCDN account API key (also used as the purge key when `BUNNY_PULLZONE_API_KEY` is unset). |
-| `BUNNY_STORAGE_ZONE` | The Storage Zone name, e.g. `speed`. |
-| `BUNNY_STORAGE_HOSTNAME` | **Optional.** The storage endpoint host; defaults to `storage.bunnycdn.com`. Set the region-specific host if your zone uses one. |
-| `BUNNY_STORAGE_USERNAME` | The Storage Zone username (informational; the app authenticates with the password). |
-| `BUNNY_STORAGE_PASSWORD` | The Storage Zone password — sent as the `AccessKey` header for uploads/file-info. |
-| `BUNNY_CDN_URL` | The Pull Zone CDN base URL, e.g. `https://speed.b-cdn.net`. |
-| `BUNNY_PULLZONE_API_KEY` | **Optional.** Pull Zone API key used to purge the CDN cache after an upload; falls back to `BUNNY_API_KEY`. |
-| `BUNNY_SCRIPT_OBFUSCATE` | **Optional.** `true` (default) obfuscates the generated script with `javascript-obfuscator`; set `false` to upload it as-is. |
-| `PAGESPEED_API_KEY` | **Required for the Home report.** A Google PageSpeed Insights API key. When unset, the Home page shows a "PageSpeed testing is not configured" banner and the Run button is disabled — it never fabricates numbers. The key is used **server-side only** and is never sent to the browser. |
+| `SPEED_SCRATCHER_OPTIMIZATION_SCRIPT_URL` | Optional static storefront optimization script URL. When unset the Setup page shows a clearly-marked placeholder block that loads nothing (no invented endpoints are ever emitted). |
 | `SUPPORT_EMAIL_WEBHOOK_URL` | **Optional.** When set, each stored support ticket is POSTed as JSON to this URL (the app's email/notification transport hook). When unset, tickets are stored but nothing is sent and the UI never claims an email was delivered. |
 
 Any change to these requires a **deploy** (or at least a service restart) to
@@ -125,7 +116,7 @@ If the service is configured as a **Node** service on Render:
 - Start command: **`npm run docker-start`** (this runs
   `prisma generate && prisma db push && npm run start`). `prisma db push` is
   what creates the `appSubscription`, `Plan`, `Script`, `ShopProfile`,
-  `SetupVerification`, `SupportTicket`, `PageSpeedReport` and `PageSpeedRun`
+  `SetupVerification`, `SupportTicket`
   collections in production.
 
 > ⚠️ **The #1 cause of the `500 Unexpected Server Error` was a plain
@@ -155,77 +146,11 @@ If you're using the `Dockerfile` in this repo (as a Docker service):
 3. Click a plan → the App Bridge redirect takes you to Shopify's hosted
    confirmation page (see `BILLING.md` for the flow).
 
-## Dashboard report & PageSpeed Insights
-
-- The **Analyze now** button on the Dashboard posts to the Dashboard route's
-  action, which creates a `PageSpeedRun` row and **returns immediately**. The
-  Google PageSpeed Insights calls (`v5/runPagespeed`, **mobile and desktop in
-  parallel**) then run **in the background on the server**, so a slow API can
-  never block or time out the merchant's browser. This is the server-side
-  replacement for the old standalone PHP endpoint; the API key never reaches
-  the browser.
-- Each successful device is stored as a normalized report in the
-  `PageSpeedReport` collection; the run's own status (PENDING → RUNNING →
-  COMPLETE/FAILED) lives in `PageSpeedRun`. The Dashboard polls a lightweight
-  authenticated endpoint (`/pagespeed-status`) until the run finishes, so a page
-  refresh mid-run keeps showing progress and the result survives the refresh.
-  A run whose worker never finished (process restart) is reclaimed as FAILED
-  after 5 minutes so the UI never polls forever.
-- The target URL is resolved from the authenticated shop's Shopify primary
-  domain (falling back to `https://<shop>/`) — never from a client-supplied
-  URL.
-- Every Lighthouse category is requested explicitly
-  (`category=performance|accessibility|best-practices|seo|agentic-browsing`);
-  without that Google returns **Performance only** and the other scores come
-  back blank. **Agentic Browsing** (Lighthouse 13.3+) has no 0–100 score — it is
-  stored/displayed as a `passed/total` ratio (`agenticBrowsing` in the stored
-  report). If an older API revision rejects the agentic value the run is retried
-  once with the four documented categories, so those are never lost.
-- **Before** = the report explicitly marked `isBaseline` — the automatic install
-  capture — and it never changes; **Current** = the most recent run per device.
-  `PageSpeedReport.isBaseline` is the marker (see `getLatestReports` /
-  `selectBaselineAndCurrent`): "Analyze now" and every later run store `false`.
-  Reports written before the marker existed have no flag and fall back to the
-  earliest report for the device, so no shop loses its Before score. When only the
-  baseline exists the Current column and the comparison show a neutral "no after
-  score yet" state instead of a fabricated result, so the install score appears
-  under **Before only**. Before the first run the dashboard shows
-  clearly-bannered **sample data**.
-- **Automatic "before speed" baseline.** As soon as a merchant installs the app
-  the server starts a background PageSpeed run for their store (the `afterAuth`
-  hook) — before the app's script is ever added — so the pre-install speed is
-  captured without the merchant doing anything. `ensureBaselinePageSpeedRun`
-  (`app/pagespeed.server.js`) is called from `afterAuth`, on every app-shell load
-  and again from the Setup loader (covering shops installed before this feature).
-  It starts **at most one** run per shop until a report exists: a missing API key,
-  an existing report or an already-created run all short-circuit, so it never
-  loops. Concurrent calls (the install hook and a page load firing together) are
-  coalesced in-process, so a shop never gets two baseline runs. Failures are
-  logged and never break install/page loads.
-- **Verify Setup needs a before score.** The Setup page always shows the script
-  (the baseline is already captured before the merchant can install it), but
-  **Verify Setup stays disabled** until a Before score exists. While the baseline
-  run is `PENDING`/`RUNNING` the page shows an inline "We're fetching your current
-  website speed" banner and polls `/pagespeed-status`, so Verify unlocks
-  automatically once the report is stored. If the automatic capture failed (or the
-  API key was only added later), a warning banner offers **Fetch my store's speed**
-  (`intent: "capture-baseline"`), so the merchant is never stuck. **Go to
-  Dashboard** shows an in-button spinner plus the App Bridge loading bar while it
-  loads, so the redirect never looks frozen.
-- **Current score captured after verification.** A successful verification (the
-  marker plus the exact per-shop CDN URL found in `<head>`) starts a background
-  **Current** run from the Setup action, so the dashboard's Before/After comparison
-  fills in without the merchant clicking **Analyze now**. It is best-effort and
-  shares the normal run cooldown/limits; a failure never fails the verification.
-
 ## Setup & Help pages (what to expect in production)
 
 ### Setup verification is presence-based, never fabricated
 
-- There is exactly **one script** (the storefront optimization script). When
-  BunnyCDN is configured it is generated **per shop** on demand (see the next
-  subsection); otherwise it falls back to the static
-  `SPEED_SCRATCHER_OPTIMIZATION_SCRIPT_URL`. Until either is configured the Setup
+- Setup reads the storefront script URL from `SPEED_SCRATCHER_OPTIMIZATION_SCRIPT_URL`. When unset the Setup
   page shows a clearly-marked placeholder that loads nothing — no script URL, app
   id or token is ever invented. The merchant copies the single code block into
   theme.liquid and clicks Verify Setup.
@@ -259,43 +184,6 @@ If you're using the `Dockerfile` in this repo (as a Docker service):
 - Results (per-script statuses + timestamp) are saved to the `SetupVerification`
   collection per shop. A 30-second per-shop cooldown and a 6-per-5-minutes
   window guard against spam clicks.
-
-### The storefront script (generated per shop, hosted on BunnyCDN)
-
-When the `BUNNY_*` env vars are set, the Setup loader generates the store's
-script the first time the page is opened (there is no button — it is automatic,
-like the legacy install page):
-
-1. **Template from the database.** The template is read from the `Script`
-   collection (the `shopify` column, falling back to `default`) — never
-   hardcoded. A column may be a plain string or an object (`{ code }`,
-   `{ script }`, `{ template }`, `{ content }`, `{ value }`). **A `Script` row
-   must exist** (with a `shopify` and/or `default` template) or generation is
-   skipped and the Setup page falls back to the static placeholder — the app
-   never invents a script body.
-2. **Variable substitution.** `{{USER_ID}}`, `{{PLATFORM}}`, `{{WEBSITE_ID}}`,
-   `{{WEBSITE_URL}}` and `{{DOMAIN}}` are replaced with the store's values. Both
-   `USER_ID` and `WEBSITE_ID` are the store's Mongo `_id` (the `ShopProfile.id`);
-   `PLATFORM` is `Shopify`; `DOMAIN` comes from the shop's primary domain. Any
-   stray `{{...}}` token is blanked so it can never break the uploaded JS.
-3. **Obfuscation.** The substituted JS is obfuscated with
-   `javascript-obfuscator` (skip with `BUNNY_SCRIPT_OBFUSCATE=false`). If the
-   package or the obfuscation step fails, the plain script is uploaded instead —
-   it never blocks the page.
-4. **Upload to BunnyCDN.** The script is PUT to
-   `scripts/{shop _id}/scrachar_{shop _id}.js` in the storage zone (the storage
-   password is the `AccessKey`), and the Pull Zone cache is purged. File info is
-   read with a ranged `GET` (`Range: bytes=0-0`) because Bunny's Storage API does
-   not answer `HEAD`.
-
-The Setup page then shows a snippet that loads that CDN URL
-(`<script data-speed-scratcher-optimization data-user-id="…"
-data-platform="Shopify" data-website-id="…" src="https://<cdn>/scripts/…/scrachar_….js" async defer>`).
-The stable marker is preserved, so verification keeps working unchanged. The
-generated URL is cached on the `ShopProfile` (`scriptCdnUrl`,
-`scriptGeneratedAt`) so the CDN is not re-checked on every load. When Bunny is
-not configured, the template is missing, or an upload fails, the Setup page
-falls back to the static/placeholder script — Setup is never broken.
 
 ### Help page & support tickets
 

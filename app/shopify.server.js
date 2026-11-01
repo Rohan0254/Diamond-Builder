@@ -7,7 +7,6 @@ import {
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
 import prisma from "./db.server";
 import { syncShopProfile } from "./shop-profile.server";
-import { ensureBaselinePageSpeedRun } from "./pagespeed.server";
 
 const shopify = shopifyApp({
   apiKey: process.env.SHOPIFY_API_KEY,
@@ -29,14 +28,6 @@ const shopify = shopifyApp({
     // syncShopProfile and can never break the install flow.
     afterAuth: async ({ session, admin }) => {
       await syncShopProfile({ shop: session.shop, admin });
-      // Capture the merchant's "before" speed as soon as the app is installed,
-      // before the app's script can change anything. Runs in the background
-      // (the run itself returns immediately); never blocks or breaks install.
-      try {
-        await ensureBaselinePageSpeedRun({ shop: session.shop, admin });
-      } catch (error) {
-        console.error("[shopify.server] baseline PageSpeed run failed", error);
-      }
     },
   },
   ...(process.env.SHOP_CUSTOM_DOMAIN

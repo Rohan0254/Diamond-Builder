@@ -19,7 +19,7 @@ import { formatDateTime, formatNumber, initials } from "../lib/admin/format";
 // at least one active Super Admin always remains).
 
 export const meta = () => [
-  { title: "Staff & roles · Speed Scratcher Super Admin" },
+  { title: "Staff & roles · Diamond Builder Super Admin" },
 ];
 
 function serializeAccount(account) {

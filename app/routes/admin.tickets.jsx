@@ -23,7 +23,7 @@ import { formatDateTime, formatNumber, truncate } from "../lib/admin/format";
 // read-only.
 
 export const meta = () => [
-  { title: "Support tickets · Speed Scratcher Super Admin" },
+  { title: "Support tickets · Diamond Builder Super Admin" },
 ];
 
 const PAGE_SIZE = 25;

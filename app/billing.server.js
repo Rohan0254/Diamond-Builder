@@ -1,4 +1,4 @@
-// Server-side Shopify billing + MongoDB persistence for Speed Scratcher.
+// Server-side Shopify billing + MongoDB persistence for Diamond Builder.
 //
 // The frontend never talks to Shopify or the database directly. This module is
 // the single place that:

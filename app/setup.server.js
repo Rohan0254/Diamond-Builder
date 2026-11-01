@@ -1,4 +1,4 @@
-// Server-side setup verification for Speed Scratcher.
+// Server-side setup verification for Diamond Builder.
 //
 // Verification reads TWO independent sources and reports honestly:
 //   1. The live (MAIN) theme's files, read through the Admin GraphQL API
@@ -27,7 +27,6 @@ import {
   detectPasswordPage,
   verifyScriptsAcrossSources,
 } from "./lib/verify";
-import { getOrCreateSetupScript } from "./scripts.server";
 
 export const STOREFRONT_FETCH_TIMEOUT_MS = 10000;
 export const VERIFY_COOLDOWN_MS = 30000;
@@ -50,47 +49,6 @@ export function getScriptDefinitions(env = process.env) {
   return getPublicScripts({
     optimizationUrl: env.SPEED_SCRATCHER_OPTIMIZATION_SCRIPT_URL || "",
   });
-}
-
-/**
- * Script definitions the Setup page shows.
- *
- * Tries the dynamic per-shop CDN script first (`app/scripts.server.js`): it
- * reads the template from the `Script` collection, substitutes the store's
- * values, obfuscates and uploads it to BunnyCDN. When Bunny is not configured,
- * the template is missing, or generation fails, it falls back to the static
- * definition (the env-configured URL, or a clearly-marked placeholder when
- * unset). Never throws.
- */
-export async function getSetupScripts({
-  shop,
-  admin,
-  force = false,
-  env = process.env,
-  fetchImpl,
-} = {}) {
-  try {
-    const result = await getOrCreateSetupScript({
-      shop,
-      admin,
-      force,
-      env,
-      fetchImpl,
-    });
-    if (
-      result.ok &&
-      Array.isArray(result.scripts) &&
-      result.scripts.length > 0
-    ) {
-      return result.scripts;
-    }
-  } catch (error) {
-    console.error(
-      "[setup.server] dynamic script generation failed; using the static script",
-      error,
-    );
-  }
-  return getScriptDefinitions(env);
 }
 
 /** Normalizes a shop domain from the authenticated session. */
@@ -117,7 +75,7 @@ export async function fetchStorefrontHtml(shop) {
       headers: {
         Accept: "text/html",
         "User-Agent":
-          "Speed-Scratcher-Verification/1.0 (+https://speed-scratchers.onrender.com)",
+          "Speed-Scratcher-Verification/1.0 (+https://diamond-builder.onrender.com)",
       },
       redirect: "follow",
       signal: controller.signal,
@@ -416,11 +374,8 @@ export async function runSetupVerification(shop, { admin } = {}) {
 
   recordRun(domain);
 
-  // Verify the exact per-shop script the Setup page shows (falling back to the
-  // static definition when generation is unavailable). When the snippet carries
-  // a CDN URL, the marker AND that URL must be present — an older snippet is
-  // reported as outdated, never as verified.
-  const setupScripts = await getSetupScripts({ shop: domain, admin });
+  // Require the configured URL as well as the marker when verifying a live script.
+  const setupScripts = getScriptDefinitions();
   const scripts = setupScripts.map((script) => ({
     key: script.key,
     src: extractScriptSrc(script.script),

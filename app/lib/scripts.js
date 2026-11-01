@@ -82,7 +82,7 @@ function buildOptimizationScript({ src = "", attributes = [] } = {}) {
      app's server environment and redeploy to generate the real script URL.
      Nothing loads until that is configured. -->
 `;
-  return `<!-- Speed Scratcher - ${meta.title} -->
+  return `<!-- Diamond Builder - ${meta.title} -->
 ${placeholder}<script ${marker}${extra}${srcAttr} defer></script>`;
 }
 
@@ -103,28 +103,6 @@ export function buildScriptDefinition({ script }) {
     installHint: meta.installHint,
     script,
   };
-}
-
-/**
- * Builds the per-shop install snippet that loads the CDN-hosted storefront
- * script. `src` is the Bunny CDN URL; the `data-*` attributes mirror the legacy
- * install snippet and the stable marker keeps verification working.
- */
-export function buildCdnInstallScript({
-  cdnUrl,
-  userId,
-  websiteId,
-  platform = "Shopify",
-} = {}) {
-  const attributes = [];
-  if (userId !== undefined && userId !== null && userId !== "") {
-    attributes.push(`data-user-id="${escapeAttribute(userId)}"`);
-  }
-  if (platform) attributes.push(`data-platform="${escapeAttribute(platform)}"`);
-  if (websiteId !== undefined && websiteId !== null && websiteId !== "") {
-    attributes.push(`data-website-id="${escapeAttribute(websiteId)}"`);
-  }
-  return buildOptimizationScript({ src: cdnUrl || "", attributes });
 }
 
 /**

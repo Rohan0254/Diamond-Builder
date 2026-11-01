@@ -6,7 +6,7 @@
 export const FAQ_ITEMS = [
   {
     id: "setup",
-    question: "How do I set up Speed Scratcher?",
+    question: "How do I set up Diamond Builder?",
     answer:
       "Follow the three steps on the Setup page: copy each script into the location described on its card, save and publish any theme changes, then click Verify Setup. The app reports the verification result for each script individually.",
   },
@@ -18,9 +18,9 @@ export const FAQ_ITEMS = [
   },
   {
     id: "theme-changes",
-    question: "Will Speed Scratcher change my Shopify theme?",
+    question: "Will Diamond Builder change my Shopify theme?",
     answer:
-      "Speed Scratcher does not edit or replace your theme files. The scripts on the Setup page are installed by you into your theme and load additional JavaScript; the app itself does not modify your theme's code. As with any third-party script, review what it does before installing it.",
+      "Diamond Builder does not edit or replace your theme files. The scripts on the Setup page are installed by you into your theme and load additional JavaScript; the app itself does not modify your theme's code. As with any third-party script, review what it does before installing it.",
   },
   {
     id: "check-optimization",

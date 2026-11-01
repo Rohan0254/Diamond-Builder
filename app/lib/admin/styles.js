@@ -1,8 +1,7 @@
 // Super admin panel styles (`/admin`).
 //
 // A single exported string, injected with <style>{ADMIN_CSS}</style> by the admin
-// layout and the sign-in page — same pattern as `lib/shell-styles.js` and
-// `lib/report/styles.js`.
+// layout and the sign-in page.
 //
 // The palette is the app's: Shopify green (#008060) as the accent, white cards on
 // the #f6f6f7 app background, #202223 text and #dadce0 hairlines, 12-16px radii.

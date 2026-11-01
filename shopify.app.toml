@@ -1,9 +1,9 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
-client_id = "4dee761690774c19ca0971bc7e5d5345"
-application_url = "https://speed-scratchers.onrender.com"
+client_id = "2e6b0617670406ffee9c3c98b0aafe39"
+application_url = "https://diamond-builder.onrender.com"
 embedded = true
-name = "Speed Scratchers"
+name = "Diamond Builder By WS"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
@@ -61,7 +61,7 @@ api_version = "2027-01"
   compliance_topics = [ "customers/data_request", "customers/redact", "shop/redact" ]
 
 [auth]
-redirect_urls = [ "https://speed-scratchers.onrender.com/api/auth" ]
+redirect_urls = [ "https://diamond-builder.onrender.com/api/auth" ]
 
 [build]
 automatically_update_urls_on_dev = true

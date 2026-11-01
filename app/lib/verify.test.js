@@ -104,7 +104,7 @@ test("a missing marker configuration is reported as unable-to-verify", () => {
 
 // ------------------------------------- per-shop CDN script (URL-aware checks)
 
-const CDN_URL = "https://speed.b-cdn.net/scripts/abc/scrachar_abc.js";
+const CDN_URL = "https://speed.example.test/scripts/abc/scrachar_abc.js";
 const CDN_SCRIPTS = [{ key: "storefront-optimization", src: CDN_URL }];
 const CDN_SNIPPET = `<script data-speed-scratcher-optimization data-user-id="abc" src="${CDN_URL}" defer></script>`;
 
@@ -138,7 +138,7 @@ test("the exact per-shop CDN script verifies from the storefront alone", () => {
 
 test("an older snippet (marker present, URL different) is reported as not verified", () => {
   const oldSnippet =
-    '<script data-speed-scratcher-optimization src="https://old.b-cdn.net/scripts/abc/scrachar_abc.js" defer></script>';
+    '<script data-speed-scratcher-optimization src="https://old.example.test/scripts/abc/scrachar_abc.js" defer></script>';
   const results = verifyScriptsAcrossSources({
     scripts: CDN_SCRIPTS,
     markers: SCRIPT_MARKERS,

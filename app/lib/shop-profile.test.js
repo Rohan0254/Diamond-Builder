@@ -12,7 +12,7 @@ const FULL_PAYLOAD = {
   data: {
     shop: {
       id: "gid://shopify/Shop/1",
-      name: "Speed Scratcher Store",
+      name: "Diamond Builder Store",
       shopOwnerName: "Rohan A",
       email: "owner@example.com",
       contactEmail: "support@example.com",
@@ -44,7 +44,7 @@ const FULL_PAYLOAD = {
 
 test("normalizeShopProfileResponse flattens a full shop payload", () => {
   const profile = normalizeShopProfileResponse(FULL_PAYLOAD);
-  assert.equal(profile.name, "Speed Scratcher Store");
+  assert.equal(profile.name, "Diamond Builder Store");
   assert.equal(profile.shopOwnerName, "Rohan A");
   assert.equal(profile.email, "owner@example.com");
   assert.equal(profile.contactEmail, "support@example.com");

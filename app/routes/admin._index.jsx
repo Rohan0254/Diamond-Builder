@@ -18,7 +18,7 @@ import AdminIcon from "../components/admin/AdminIcon.jsx";
 // install lifecycle and ticket activity. Counts are read from the database on
 // every load — nothing is cached or invented.
 
-export const meta = () => [{ title: "Dashboard · Speed Scratcher Super Admin" }];
+export const meta = () => [{ title: "Dashboard · Diamond Builder Super Admin" }];
 
 function serializeEvent(event) {
   return {
