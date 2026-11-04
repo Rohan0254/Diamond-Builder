@@ -4,15 +4,15 @@ import { PLANS, PLAN_KEYS, COMPARISON_ROWS, getPlan, isValidPlanKey, formatPrice
 import { buildSubscriptionCreateVariables, mapShopifySubscriptionToRecord } from "./billing.js";
 
 test("BYOR catalog has the requested USD prices and annual totals", () => {
-  assert.deepEqual(PLAN_KEYS, ["free","basic","standard","premium"]);
+  assert.deepEqual(PLAN_KEYS, ["free","basic","advance"]);
   assert.deepEqual(PLANS.map(p => [p.key,p.currency,p.price,p.annualPrice]), [
-    ["free","USD",0,0], ["basic","USD",39,390], ["standard","USD",59,590], ["premium","USD",110,1100]
+    ["free","USD",0,0], ["basic","USD",39,390], ["advance","USD",110,1100]
   ]);
-  assert.deepEqual(PLANS.filter(p => p.popular).map(p => p.key), ["standard"]);
+  assert.deepEqual(PLANS.filter(p => p.popular).map(p => p.key), ["advance"]);
   assert.equal(getPlan("free").trialDays,0);
 });
 test("monthly and annual selections produce exact server-controlled Shopify amounts", () => {
-  for (const key of ["basic","standard","premium"]) {
+  for (const key of ["basic","advance"]) {
     for (const cycle of ["monthly","yearly"]) {
       const original = getPlan(key);
       const plan = withBillingCycle(original,cycle);
@@ -35,10 +35,10 @@ test("Free stays free in both cycle views", () => {
   assert.equal(withBillingCycle(getPlan("free"),"yearly").entitlements.advancedCss,false);
 });
 test("inventory, AI and logo limits match the requested tiers", () => {
-  assert.deepEqual(PLANS.map(p=>p.entitlements.aiMessagesPerMonth),[20,40,60,100]);
-  assert.deepEqual(PLANS.map(p=>p.entitlements.nivodaInventoryPercent),[0,50,70,100]);
-  assert.deepEqual(PLANS.map(p=>p.entitlements.ownInventoryPercent),[30,50,70,100]);
-  assert.deepEqual(PLANS.map(p=>p.entitlements.logoRemoval),[false,false,false,true]);
+  assert.deepEqual(PLANS.map(p=>p.entitlements.aiMessagesPerMonth),[20,40,100]);
+  assert.deepEqual(PLANS.map(p=>p.entitlements.nivodaInventoryPercent),[0,50,100]);
+  assert.deepEqual(PLANS.map(p=>p.entitlements.ownInventoryPercent),[30,50,100]);
+  assert.deepEqual(PLANS.map(p=>p.entitlements.logoRemoval),[false,false,true]);
   assert.ok(PLANS.every(p=>p.entitlements.uploadLimitMb===2));
   for (const p of PLANS) for (const row of COMPARISON_ROWS) assert.equal(typeof p.entitlements[row.key],"boolean");
 });
@@ -48,8 +48,8 @@ test("plan keys and prices are validated against catalog", () => {
   assert.equal(isValidPlanKey("free"),true);
   assert.equal(isValidPlanKey("pro"),false);
   assert.equal(formatPrice(getPlan("basic")),"$39.00");
-  assert.equal(findPlanByPrice(590,"usd").key,"standard");
-  assert.equal(findPlanByPrice(59,"EUR"),null);
+  assert.equal(findPlanByPrice(1100,"usd").key,"advance");
+  assert.equal(findPlanByPrice(110,"EUR"),null);
   assert.equal(findPlanByPrice(99,"USD"),null);
 });
 test("annual prices survive public, normalized and database representations", () => {
@@ -62,9 +62,9 @@ test("annual prices survive public, normalized and database representations", ()
   assert.ok(!PLANS[0].features.includes("changed"));
 });
 test("annual reconciliation preserves tier and billing interval", () => {
-  const subscription={id:"gid://shopify/AppSubscription/1",status:"ACTIVE",lineItems:[{plan:{pricingDetails:{price:{amount:590,currencyCode:"USD"},interval:"ANNUAL"}}}]};
+  const subscription={id:"gid://shopify/AppSubscription/1",status:"ACTIVE",lineItems:[{plan:{pricingDetails:{price:{amount:1100,currencyCode:"USD"},interval:"ANNUAL"}}}]};
   const record=mapShopifySubscriptionToRecord({shop:"demo.myshopify.com",subscription});
-  assert.equal(record.planKey,"standard");
-  assert.equal(record.price,590);
+  assert.equal(record.planKey,"advance");
+  assert.equal(record.price,1100);
   assert.equal(record.billingInterval,"ANNUAL");
 });

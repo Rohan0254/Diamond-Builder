@@ -2,26 +2,25 @@
 export const CURRENCY_CODE = "USD";
 export const BILLING_INTERVAL = "EVERY_30_DAYS";
 export const TRIAL_DAYS = 14;
-export const PLAN_KEYS = ["free", "basic", "standard", "premium"];
+export const PLAN_KEYS = ["free", "basic", "advance"];
 const common = ["Ring, Earring & Pendant Builders", "Appearance, Language & Region Manager"];
 export const PLANS = [
   { key:"free", name:"Free", price:0, annualPrice:0, messages:20, inventory:0, own:30, extra:["Sample diamonds only (no Nivoda feed)", "Keyideas logo shown (cannot be removed)", "Add-ons, suppliers & CSS: not available"] },
   { key:"basic", name:"Basic", price:39, annualPrice:390, messages:40, inventory:50, own:50, extra:["Logo removal & add-ons: $330 each", "Advanced CSS (yearly plans only)"] },
-  { key:"standard", name:"Standard", price:59, annualPrice:590, messages:60, inventory:70, own:70, extra:["Logo removal & add-ons: $230 each", "Advanced CSS (yearly plans only)"] },
-  { key:"premium", name:"Premium", price:110, annualPrice:1100, messages:100, inventory:100, own:100, extra:["No Keyideas logo; add-ons $230 each", "Advanced CSS (yearly plans only)"] },
+  { key:"advance", name:"Advance", price:110, annualPrice:1100, messages:100, inventory:100, own:100, extra:["No Keyideas logo; add-ons $230 each", "Advanced CSS (yearly plans only)"] },
 ].map(({ messages, inventory, own, extra, ...plan }) => ({
   ...plan, currency:CURRENCY_CODE, interval:BILLING_INTERVAL,
   trialDays:plan.price === 0 ? 0 : TRIAL_DAYS,
   description:plan.price === 0 ? "Explore with sample diamonds" : "Build your jewelry shopping experience",
-  popular:plan.key === "standard",
+  popular:plan.key === "advance",
   features:[common[0], "AI Diamond Score + Ask AI: " + messages + " msgs/mo", common[1],
     ...(inventory ? ["Nivoda: " + inventory + "% of inventory (account required)"] : []),
     "Own diamonds (2MB upload): " + own + "% shown",
     "Free filters & engraving (limited time)", ...extra],
   entitlements:{builders:true, aiDiamondScore:true, appearanceManager:true, nivoda:inventory > 0,
-    logoRemoval:plan.key === "premium", addOns:plan.price > 0, advancedCss:plan.price > 0,
+    logoRemoval:plan.key === "advance", addOns:plan.price > 0, advancedCss:plan.price > 0,
     aiMessagesPerMonth:messages, nivodaInventoryPercent:inventory, ownInventoryPercent:own,
-    uploadLimitMb:2, logoRemovalPrice:plan.key === "free" ? null : plan.key === "basic" ? 330 : plan.key === "standard" ? 230 : 0,
+    uploadLimitMb:2, logoRemovalPrice:plan.key === "free" ? null : plan.key === "basic" ? 330 : 0,
     addOnPrice:plan.key === "free" ? null : plan.key === "basic" ? 330 : 230}
 }));
 export const COMPARISON_ROWS = [
