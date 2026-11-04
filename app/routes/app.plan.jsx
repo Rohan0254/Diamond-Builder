@@ -19,6 +19,7 @@ import {
 } from "../billing.server";
 import {
   COMPARISON_ROWS,
+  withBillingCycle,
   TRIAL_ROW_LABEL,
   findPlanByPrice,
   formatPrice,
@@ -41,7 +42,7 @@ const PENDING_DEDUPE_WINDOW_MS = 2 * 60 * 1000;
  * React Router v7 removed the `json` helper, so loaders/actions must return
  * an explicit Response. This is a drop-in replacement for the old helper.
  */
-function json(data, init) {
+function json(data, init = {}) {
   const { status, headers, ...rest } = init ?? {};
   return new Response(JSON.stringify(data), {
     ...rest,
@@ -164,7 +165,11 @@ async function handleSelect({ form, request, admin, session }) {
   // Live plans from the `Plan` collection — the price charged is whatever the
   // database row says, never anything the browser sent.
   const plans = await getPlans();
-  const plan = getPlan(planKey, plans);
+  const basePlan = getPlan(planKey, plans);
+  const cycle = String(form.get("cycle") ?? "monthly");
+  if (!["monthly", "yearly"].includes(cycle)) return json({ok:false,error:"Invalid billing cycle."},{status:400});
+  let plan;
+  try { plan = basePlan ? withBillingCycle(basePlan, cycle) : null; } catch { return json({ok:false,error:"Annual billing is unavailable."},{status:400}); }
 
   // Never trust the price/plan from the browser: validate against the server
   // config, and never let a merchant start a plan that has been deactivated.
@@ -203,7 +208,7 @@ async function handleSelect({ form, request, admin, session }) {
     );
   }
 
-  if (activePlanKey === plan.key) {
+  if (activePlanKey === plan.key && localSubscriptions.some((record) => isActiveStatus(record.status) && record.planKey === plan.key && record.billingInterval === plan.interval)) {
     return json(
       { ok: false, error: `You're already subscribed to the ${plan.name} plan.` },
       { status: 409 },
@@ -225,6 +230,19 @@ async function handleSelect({ form, request, admin, session }) {
         { status: 409 },
       );
     }
+  }
+
+  if (plan.price === 0) {
+    try {
+      const active = await fetchActiveSubscriptions(admin);
+      for (const subscription of active) {
+        const result = await cancelShopifySubscription(admin, {subscriptionId: subscription.id, prorate:true});
+        if (!result.ok) return json({ok:false,error:result.userErrors[0]?.message ?? "Could not cancel the paid plan."},{status:502});
+        const record = localSubscriptions.find((item) => item.shopifySubscriptionId === subscription.id);
+        if (record) await markSubscriptionCancelled(record.id);
+      }
+      return json({ok:true,message:"Free plan selected."});
+    } catch { return json({ok:false,error:"Could not switch to Free. Please retry."},{status:502}); }
   }
 
   const hasBillingHistory =
@@ -402,7 +420,9 @@ export const action = async ({ request }) => {
   }
 };
 
+/** @returns {{label: string, disabled: boolean, variant: "primary" | "secondary"}} */
 function planActionState(plan, subscription) {
+  if (plan.price === 0) return {label:subscription?.isActive ? "Switch to Free" : "Current plan", disabled:!subscription?.isActive, variant:"secondary"};
   if (!subscription) {
     return {
       label: "Start 14-day free trial",
@@ -411,7 +431,7 @@ function planActionState(plan, subscription) {
     };
   }
   if (subscription.isActive) {
-    if (subscription.planKey === plan.key) {
+    if (subscription.planKey === plan.key && subscription.billingInterval === plan.interval) {
       return { label: "Your current plan", disabled: true, variant: "secondary" };
     }
     return {
@@ -421,7 +441,7 @@ function planActionState(plan, subscription) {
     };
   }
   if (subscription.isPending) {
-    if (subscription.planKey === plan.key) {
+    if (subscription.planKey === plan.key && subscription.billingInterval === plan.interval) {
       return { label: "Awaiting approval", disabled: true, variant: "secondary" };
     }
     return { label: "Pending approval", disabled: true, variant: "secondary" };
@@ -435,7 +455,7 @@ function planActionState(plan, subscription) {
 
 function PlanCard({ plan, subscription, busy, onSelect, onCancel }) {
   const action = planActionState(plan, subscription);
-  const isCurrent = subscription?.planKey === plan.key;
+  const isCurrent = subscription?.planKey === plan.key && subscription.billingInterval === plan.interval;
   const showPopular = plan.popular;
   const showCurrent = Boolean(subscription?.isActive && isCurrent);
   const showAwaiting = Boolean(subscription?.isPending && isCurrent);
@@ -455,8 +475,9 @@ function PlanCard({ plan, subscription, busy, onSelect, onCancel }) {
           </s-stack>
 
           <div>
-            <span className="ss-plan-price">{formatPrice(plan)}</span>
-            <span className="ss-plan-price__suffix">/month</span>
+            <span className="ss-plan-price">{plan.price === 0 ? "Free" : formatPrice(plan)}</span>
+            {plan.price > 0 && <span className="ss-plan-price__suffix">/{plan.interval === "ANNUAL" ? "year" : "month"}</span>}
+            {plan.price > 0 && plan.interval !== "ANNUAL" && <p>or {formatPrice({...plan, price:plan.annualPrice})}/year · save 17%</p>}
           </div>
 
           <s-text color="subdued">{plan.description}</s-text>
@@ -528,7 +549,7 @@ function ComparePlans({ plans }) {
                 <s-table-cell>{row.label}</s-table-cell>
                 {plans.map((plan) => (
                   <s-table-cell key={plan.key}>
-                    {plan.entitlements[row.key] ? (
+                    {(row.key === "advancedCss" ? plan.interval === "ANNUAL" && plan.entitlements[row.key] : plan.entitlements[row.key]) ? (
                       <s-text tone="success" fontWeight="semibold">
                         ✓
                       </s-text>
@@ -543,7 +564,7 @@ function ComparePlans({ plans }) {
               <s-table-cell>{TRIAL_ROW_LABEL}</s-table-cell>
               {plans.map((plan) => (
                 <s-table-cell key={plan.key}>
-                  <s-text tone="success">{plan.trialDays}-day free trial</s-text>
+                  <s-text tone="success">{plan.price === 0 ? "Free forever" : plan.trialDays + "-day free trial"}</s-text>
                 </s-table-cell>
               ))}
             </s-table-row>
@@ -584,7 +605,7 @@ function CurrentSubscription({ subscription, busy, onCancel, onRetry }) {
         </s-stack>
 
         <s-text color="subdued">
-          {formatPrice(subscription)} / month · billed{" "}
+          {formatPrice(subscription)} / {subscription.billingInterval === "ANNUAL" ? "year" : "month"} · billed{" "}
           {subscription.billingInterval === "ANNUAL" ? "annually" : "monthly"}
         </s-text>
 
@@ -653,7 +674,7 @@ function CancelSubscriptionModal({ open, busy, onClose, onConfirm }) {
       }
       // Force open
       if (typeof modal.open === "function" && modal.hasAttribute && !modal.hasAttribute('open')) {
-        try { modal.open(); } catch (e) {}
+        try { modal.open(); } catch { /* The overlay may already be open. */ }
       }
     } else {
       hideOverlaySafe(modal);
@@ -690,7 +711,6 @@ function CancelSubscriptionModal({ open, busy, onClose, onConfirm }) {
       ref={modalRef}
       id="cancel-subscription-modal"
       heading="Cancel subscription?"
-      hideCloseButton={false}
     >
       <s-stack direction="block" gap="base">
         <s-text>
@@ -726,7 +746,9 @@ function hideOverlaySafe(element) {
 }
 
 export default function PlanPage() {
-  const { plans, subscription, loadError, authError, testMode } = useLoaderData();
+  const { plans: catalogPlans, subscription, loadError, authError, testMode } = useLoaderData();
+  const [cycle, setCycle] = useState(() => subscription?.billingInterval === "ANNUAL" ? "yearly" : "monthly");
+  const plans = catalogPlans.map((plan) => withBillingCycle(plan, cycle));
   const fetcher = useFetcher();
   const shopify = useAppBridge();
   const lastConfirmationUrl = useRef(null);
@@ -772,6 +794,7 @@ export default function PlanPage() {
       {
         intent: "select",
         planKey,
+        cycle: retry ? (subscription?.billingInterval === "ANNUAL" ? "yearly" : "monthly") : cycle,
         ...(retry ? { retry: "1" } : {}),
         // Keep the embedded params (shop/host) so the post-approval return URL
         // can re-open the app inside the same Shopify admin.
@@ -806,6 +829,10 @@ export default function PlanPage() {
   return (
     <s-page heading="Choose the Right Plan for Your Store">
       <style>{`
+        .ss-billing-switch { display:flex; gap:4px; width:fit-content; padding:4px; background:#f1f2f3; border-radius:10px; }
+        .ss-billing-switch button { border:0; border-radius:7px; padding:10px 16px; background:transparent; cursor:pointer; font:inherit; }
+        .ss-billing-switch button[aria-pressed="true"] { background:#fff; box-shadow:0 1px 4px #0002; font-weight:600; }
+        .ss-billing-switch span { color:#008060; font-size:12px; }
         .ss-plan-card {
           background: #ffffff;
           border: 1px solid var(--p-color-border-subdued, #e1e3e5);
@@ -845,10 +872,10 @@ export default function PlanPage() {
       <s-stack direction="block" gap="base">
         <s-stack direction="block" gap="small">
           <s-text color="subdued">
-            Optimize your store performance with a plan that fits your business.
+            Choose the diamond builder plan that fits your business.
           </s-text>
           <s-stack direction="inline" gap="small" alignItems="center">
-            <s-badge tone="success">14-day free trial on every plan</s-badge>
+            <s-badge tone="success">Free plan available · 14-day trial on paid plans</s-badge>
             {testMode && <s-badge tone="warning">Test mode</s-badge>}
           </s-stack>
         </s-stack>
@@ -899,6 +926,10 @@ export default function PlanPage() {
           onRetry={retryApproval}
         />
 
+        <div className="ss-billing-switch" role="group" aria-label="Billing cycle">
+          <button type="button" aria-pressed={cycle === "monthly"} onClick={() => setCycle("monthly")}>Monthly</button>
+          <button type="button" aria-pressed={cycle === "yearly"} onClick={() => setCycle("yearly")}>Yearly <span>Save 17%</span></button>
+        </div>
         <s-grid
           gridTemplateColumns="repeat(auto-fit, minmax(280px, 1fr))"
           gap="base"
@@ -918,7 +949,7 @@ export default function PlanPage() {
         <ComparePlans plans={plans} />
 
         <s-text color="subdued">
-          Prices are in USD. Every plan includes a 14-day free trial, and billing
+          Prices are in USD. Paid plans include a 14-day free trial, and billing
           is handled securely by Shopify. Your trial only starts once Shopify
           confirms the subscription.
         </s-text>

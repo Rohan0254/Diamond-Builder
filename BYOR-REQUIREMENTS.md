@@ -1,6 +1,6 @@
 # Build Your Own Ring (BYOR)
 
-Diamond Builder lets a Shopify merchant offer a ring builder on their storefront. The app serves the diamond listing. The customer shops on the merchant's store and chooses the diamond and ring that they want to purchase together.
+Diamond Builder lets merchants on Shopify, WordPress, BigCommerce, and future platforms offer a ring builder on their storefront. The app serves the diamond listing. The customer shops on the merchant's store and chooses the diamond and ring that they want to purchase together.
 
 ## First milestone: diamond categories and imports
 
@@ -28,3 +28,11 @@ A customer can start on a merchant's diamond listing, choose a diamond and a rin
 ## Decisions still open
 
 The source of ring settings, compatibility rules, pricing, inventory reservation, and how the combination is represented in Shopify's cart are not yet specified. These are implementation decisions to settle when designing the corresponding feature.
+
+## Multi-platform hosted listing
+
+This project hosts one shared customer listing UI embedded in merchant webpages through an iframe. Platform-specific installation, authentication, lifecycle, embed bridges, and cart adapters belong in app/integrations/<platform>. Shared diamond logic belongs in app/features/diamonds; customer listing UI belongs in app/features/listing.
+
+The server identifies the merchant and platform from a verified integration context and serves the common UI with that merchant's settings and permitted catalog. Caller-supplied domain or platform labels alone never authorize catalog access. Keep the shared Prisma pool, bounded queries, and query-specific indexes for every platform. Follow ARCHITECTURE.md for ownership and implementation stages.
+
+These requirements extend the project scope; customer iframe routes and additional platform integrations are future implementation work. WordPress commerce support and cart representation per platform remain open decisions.

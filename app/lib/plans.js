@@ -1,156 +1,48 @@
-// Plan definitions and pure helpers shared by the server, the pricing UI and
-// the tests.
-//
-// The authoritative plans live in the `Plan` collection in MongoDB (see
-// `app/plans.server.js`): edit a row there — price, name, description, features,
-// entitlements, active, position — and the app picks it up on the next request.
-// The `PLANS` array below is only the built-in default used to seed an empty
-// collection and as a last-resort fallback when the database is unreachable.
-//
-// This module is intentionally free of Shopify/Prisma imports so the pure
-// transforms can be reused by the browser bundle and unit tested without IO.
-// Prices/intervals/trials must never be trusted from the client.
-
+// Shared BYOR catalog. Prices are server-controlled USD amounts.
 export const CURRENCY_CODE = "USD";
 export const BILLING_INTERVAL = "EVERY_30_DAYS";
 export const TRIAL_DAYS = 14;
-
-/** Ordered list of plan keys. The order here drives the UI. */
-export const PLAN_KEYS = ["basic", "pro", "advanced"];
-
-/**
- * Default (seed) plans. Inserted into the `Plan` collection the first time it is
- * read while empty, and used as a fallback if the database cannot be reached.
- * Runtime pricing comes from the database, not from this array.
- *
- * @type {ReadonlyArray<{
- *   key: string,
- *   name: string,
- *   price: number,
- *   currency: string,
- *   interval: string,
- *   trialDays: number,
- *   description: string,
- *   popular: boolean,
- *   features: string[],
- *   entitlements: Record<string, boolean>,
- * }>}
- */
+export const PLAN_KEYS = ["free", "basic", "standard", "premium"];
+const common = ["Ring, Earring & Pendant Builders", "Appearance, Language & Region Manager"];
 export const PLANS = [
-  {
-    key: "basic",
-    name: "Basic",
-    price: 9.99,
-    currency: CURRENCY_CODE,
-    interval: BILLING_INTERVAL,
-    trialDays: TRIAL_DAYS,
-    description: "Perfect for growing stores",
-    popular: false,
-    features: [
-      "Automatic speed optimization",
-      "Image compression",
-      "Lazy-load optimization",
-      "Basic analytics",
-      "Email support",
-    ],
-    entitlements: {
-      speedOptimization: true,
-      imageCompression: true,
-      lazyLoad: true,
-      coreWebVitals: false,
-      jsCssOptimization: false,
-      performanceRecommendations: false,
-      customRules: false,
-      advancedAnalytics: false,
-      prioritySupport: false,
-      dedicatedSupport: false,
-    },
-  },
-  {
-    key: "pro",
-    name: "Pro",
-    price: 19.99,
-    currency: CURRENCY_CODE,
-    interval: BILLING_INTERVAL,
-    trialDays: TRIAL_DAYS,
-    description: "Best for established stores",
-    popular: true,
-    features: [
-      "All Basic features",
-      "Advanced speed optimization",
-      "Core Web Vitals improvements",
-      "JavaScript and CSS optimization",
-      "Performance recommendations",
-      "Priority support",
-    ],
-    entitlements: {
-      speedOptimization: true,
-      imageCompression: true,
-      lazyLoad: true,
-      coreWebVitals: true,
-      jsCssOptimization: true,
-      performanceRecommendations: true,
-      customRules: false,
-      advancedAnalytics: false,
-      prioritySupport: true,
-      dedicatedSupport: false,
-    },
-  },
-  {
-    key: "advanced",
-    name: "Advanced",
-    price: 39.99,
-    currency: CURRENCY_CODE,
-    interval: BILLING_INTERVAL,
-    trialDays: TRIAL_DAYS,
-    description: "For high-volume stores",
-    popular: false,
-    features: [
-      "All Pro features",
-      "Advanced caching and optimization",
-      "Custom optimization rules",
-      "Advanced performance analytics",
-      "Dedicated performance support",
-    ],
-    entitlements: {
-      speedOptimization: true,
-      imageCompression: true,
-      lazyLoad: true,
-      coreWebVitals: true,
-      jsCssOptimization: true,
-      performanceRecommendations: true,
-      customRules: true,
-      advancedAnalytics: true,
-      prioritySupport: true,
-      dedicatedSupport: true,
-    },
-  },
-];
-
-/**
- * Rows rendered in the "Compare plans" table. The keys map onto each plan's
- * `entitlements` object so the table can never drift from the plan config.
- * The trial row is rendered separately and always shows `TRIAL_DAYS`.
- */
+  { key:"free", name:"Free", price:0, annualPrice:0, messages:20, inventory:0, own:30, extra:["Sample diamonds only (no Nivoda feed)", "Keyideas logo shown (cannot be removed)", "Add-ons, suppliers & CSS: not available"] },
+  { key:"basic", name:"Basic", price:39, annualPrice:390, messages:40, inventory:50, own:50, extra:["Logo removal & add-ons: $330 each", "Advanced CSS (yearly plans only)"] },
+  { key:"standard", name:"Standard", price:59, annualPrice:590, messages:60, inventory:70, own:70, extra:["Logo removal & add-ons: $230 each", "Advanced CSS (yearly plans only)"] },
+  { key:"premium", name:"Premium", price:110, annualPrice:1100, messages:100, inventory:100, own:100, extra:["No Keyideas logo; add-ons $230 each", "Advanced CSS (yearly plans only)"] },
+].map(({ messages, inventory, own, extra, ...plan }) => ({
+  ...plan, currency:CURRENCY_CODE, interval:BILLING_INTERVAL,
+  trialDays:plan.price === 0 ? 0 : TRIAL_DAYS,
+  description:plan.price === 0 ? "Explore with sample diamonds" : "Build your jewelry shopping experience",
+  popular:plan.key === "standard",
+  features:[common[0], "AI Diamond Score + Ask AI: " + messages + " msgs/mo", common[1],
+    ...(inventory ? ["Nivoda: " + inventory + "% of inventory (account required)"] : []),
+    "Own diamonds (2MB upload): " + own + "% shown",
+    "Free filters & engraving (limited time)", ...extra],
+  entitlements:{builders:true, aiDiamondScore:true, appearanceManager:true, nivoda:inventory > 0,
+    logoRemoval:plan.key === "premium", addOns:plan.price > 0, advancedCss:plan.price > 0,
+    aiMessagesPerMonth:messages, nivodaInventoryPercent:inventory, ownInventoryPercent:own,
+    uploadLimitMb:2, logoRemovalPrice:plan.key === "free" ? null : plan.key === "basic" ? 330 : plan.key === "standard" ? 230 : 0,
+    addOnPrice:plan.key === "free" ? null : plan.key === "basic" ? 330 : 230}
+}));
 export const COMPARISON_ROWS = [
-  { key: "speedOptimization", label: "Automatic speed optimization" },
-  { key: "imageCompression", label: "Image compression" },
-  { key: "lazyLoad", label: "Lazy-load optimization" },
-  { key: "coreWebVitals", label: "Core Web Vitals improvements" },
-  { key: "jsCssOptimization", label: "JavaScript and CSS optimization" },
-  { key: "performanceRecommendations", label: "Performance recommendations" },
-  { key: "customRules", label: "Custom optimization rules" },
-  { key: "advancedAnalytics", label: "Advanced analytics" },
-  { key: "prioritySupport", label: "Priority support" },
-  { key: "dedicatedSupport", label: "Dedicated performance support" },
+  {key:"builders",label:"Ring, Earring & Pendant Builders"},
+  {key:"aiDiamondScore",label:"AI Diamond Score + Ask AI"},
+  {key:"appearanceManager",label:"Appearance, Language & Region Manager"},
+  {key:"nivoda",label:"Nivoda inventory (account required)"},
+  {key:"logoRemoval",label:"Logo removal included"},
+  {key:"addOns",label:"Paid add-ons available"},
+  {key:"advancedCss",label:"Advanced CSS (yearly plans only)"}
 ];
-
 export const TRIAL_ROW_LABEL = "Trial duration";
 
-/**
- * Returns the plan configuration for a key, or `null` when unknown. Pass a
- * database-backed list to operate on live plans; defaults to the seed list.
- */
+export function withBillingCycle(plan, cycle = "monthly") {
+  if (cycle !== "monthly" && cycle !== "yearly") throw new Error("Invalid billing cycle");
+  if (cycle === "yearly" && plan.price > 0 && !(plan.annualPrice > 0)) throw new Error("Annual billing is unavailable for this plan");
+  return {...plan, price:cycle === "yearly" ? plan.annualPrice ?? 0 : plan.price,
+    interval:cycle === "yearly" ? "ANNUAL" : BILLING_INTERVAL,
+    entitlements:{...plan.entitlements, advancedCss:cycle === "yearly" && Boolean(plan.entitlements?.advancedCss)}};
+}
+
 export function getPlan(planKey, plans = PLANS) {
   if (typeof planKey !== "string") return null;
   return plans.find((plan) => plan.key === planKey) ?? null;
@@ -170,6 +62,7 @@ export function getPublicPlans(plans = PLANS) {
     key: plan.key,
     name: plan.name,
     price: Number(plan.price ?? 0),
+    annualPrice: plan.annualPrice == null ? null : Number(plan.annualPrice),
     currency: plan.currency ?? CURRENCY_CODE,
     interval: plan.interval ?? BILLING_INTERVAL,
     trialDays: Number(plan.trialDays ?? TRIAL_DAYS),
@@ -208,7 +101,7 @@ export function findPlanByPrice(amount, currencyCode, plans = PLANS) {
   return (
     plans.find(
       (plan) =>
-        Math.abs(Number(plan.price) - numericAmount) < 0.001 &&
+        (Math.abs(Number(plan.price) - numericAmount) < 0.001 || (plan.annualPrice != null && Math.abs(Number(plan.annualPrice) - numericAmount) < 0.001)) &&
         String(plan.currency ?? CURRENCY_CODE).toUpperCase() === code,
     ) ?? null
   );
@@ -225,6 +118,7 @@ export function normalizePlan(row) {
     key: String(row.key),
     name: String(row.name ?? row.key ?? ""),
     price: Number.isFinite(Number(row.price)) ? Number(row.price) : 0,
+    annualPrice: row.annualPrice == null ? null : Number(row.annualPrice),
     currency: row.currency ?? CURRENCY_CODE,
     interval: row.interval ?? BILLING_INTERVAL,
     trialDays: Number.isFinite(Number(row.trialDays))
@@ -251,6 +145,7 @@ export function planToRecord(plan, position = 0) {
     key: plan.key,
     name: plan.name,
     price: plan.price,
+    annualPrice: plan.annualPrice ?? null,
     currency: plan.currency ?? CURRENCY_CODE,
     interval: plan.interval ?? BILLING_INTERVAL,
     trialDays: plan.trialDays ?? TRIAL_DAYS,

@@ -22,12 +22,12 @@ import {
 } from "./billing.js";
 import { getPlan } from "./plans.js";
 
-const proPlan = getPlan("pro");
+const standardPlan = getPlan("standard");
 
 function makeSubscription(overrides = {}) {
   return {
     id: "gid://shopify/AppSubscription/1",
-    name: "Pro",
+    name: "Standard",
     status: "ACTIVE",
     test: false,
     trialDays: 14,
@@ -38,7 +38,7 @@ function makeSubscription(overrides = {}) {
         id: "gid://shopify/AppSubscriptionLineItem/1",
         plan: {
           pricingDetails: {
-            price: { amount: "19.99", currencyCode: "USD" },
+            price: { amount: "59", currencyCode: "USD" },
             interval: "EVERY_30_DAYS",
           },
         },
@@ -125,25 +125,25 @@ test("a missing confirmation URL is treated as a billing error", () => {
 
 test("buildSubscriptionCreateVariables builds a recurring line item", () => {
   const variables = buildSubscriptionCreateVariables({
-    plan: proPlan,
+    plan: standardPlan,
     returnUrl: "https://app.example.com/app/plan",
     test: true,
     trialDays: 14,
     replacementBehavior: undefined,
   });
-  assert.equal(variables.name, "Pro");
+  assert.equal(variables.name, "Standard");
   assert.equal(variables.test, true);
   assert.equal(variables.trialDays, 14);
   assert.equal(variables.replacementBehavior, undefined);
   const details = variables.lineItems[0].plan.appRecurringPricingDetails;
   assert.equal(details.interval, "EVERY_30_DAYS");
-  assert.equal(details.price.amount, 19.99);
+  assert.equal(details.price.amount, 59);
   assert.equal(details.price.currencyCode, "USD");
 });
 
 test("buildSubscriptionCreateVariables passes replacement behaviour for changes", () => {
   const variables = buildSubscriptionCreateVariables({
-    plan: proPlan,
+    plan: standardPlan,
     returnUrl: "https://app.example.com/app/plan",
     test: false,
     trialDays: 0,
@@ -221,7 +221,7 @@ test("computeTrialDays only grants a trial to first-time subscribers", () => {
 test("selectRecurringPricing reads the recurring price and interval", () => {
   const pricing = selectRecurringPricing(makeSubscription());
   assert.deepEqual(pricing, {
-    amount: 19.99,
+    amount: 59,
     currencyCode: "USD",
     interval: "EVERY_30_DAYS",
   });
@@ -241,9 +241,9 @@ test("mapShopifySubscriptionToRecord maps an active Pro subscription", () => {
     subscription: makeSubscription(),
   });
   assert.equal(record.shop, "demo.myshopify.com");
-  assert.equal(record.planKey, "pro");
-  assert.equal(record.planName, "Pro");
-  assert.equal(record.price, 19.99);
+  assert.equal(record.planKey, "standard");
+  assert.equal(record.planName, "Standard");
+  assert.equal(record.price, 59);
   assert.equal(record.status, "ACTIVE");
   assert.equal(record.billingInterval, "EVERY_30_DAYS");
   assert.equal(record.shopifySubscriptionId, "gid://shopify/AppSubscription/1");
