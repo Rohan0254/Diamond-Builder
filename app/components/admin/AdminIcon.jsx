@@ -69,6 +69,48 @@ const PATHS = {
       <path d="m15.5 15.5 4 4" />
     </>
   ),
+  filters: (
+    <>
+      <path d="M4 6h16M4 12h16M4 18h16" />
+      <circle cx="9" cy="6" r="1.8" fill="var(--sa-surface, #fff)" />
+      <circle cx="15" cy="12" r="1.8" fill="var(--sa-surface, #fff)" />
+      <circle cx="8" cy="18" r="1.8" fill="var(--sa-surface, #fff)" />
+    </>
+  ),
+  sort: (
+    <>
+      <path d="M8 4v16m0 0-3-3m3 3 3-3M16 20V4m0 0-3 3m3-3 3 3" />
+    </>
+  ),
+  columns: (
+    <>
+      <rect x="3.5" y="4.5" width="17" height="15" rx="1.5" />
+      <path d="M9 5v14m6-14v14" />
+    </>
+  ),
+  chevronDown: <path d="m6 9 6 6 6-6" />,
+  chevronUp: <path d="m6 15 6-6 6 6" />,
+  close: <path d="m6 6 12 12M18 6 6 18" />,
+  view: (
+    <>
+      <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" />
+      <circle cx="12" cy="12" r="2.7" />
+    </>
+  ),
+  edit: (
+    <>
+      <path d="m14 5 5 5" />
+      <path d="m4 20 4.5-1 10-10a2.1 2.1 0 0 0-3-3l-10 10L4 20Z" />
+    </>
+  ),
+  refresh: (
+    <>
+      <path d="M20 7v5h-5" />
+      <path d="M19 12a7 7 0 0 0-12-4.8L5 9" />
+      <path d="M4 17v-5h5" />
+      <path d="M5 12a7 7 0 0 0 12 4.8L19 15" />
+    </>
+  ),
   arrowUp: (
     <>
       <path d="M12 19V5" />

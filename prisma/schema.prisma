@@ -238,3 +238,83 @@ model Plan {
 
   @@index([position])
 }
+
+/// Staff-managed source of diamonds. The list paginates on MongoDB's indexed _id.
+model Vendor {
+  id           String  @id @default(auto()) @map("_id") @db.ObjectId
+  name         String
+  vendorCode   String? @unique
+  category     String
+  diamondCount Int     @default(0)
+  feedUrl      String
+  feedType     String
+  enabled      Boolean @default(true)
+  lastImportAt DateTime?
+  currentImportJobId String?
+  sample       Boolean @default(false)
+
+  @@index([lastImportAt, id])
+  @@index([category, id])
+}
+
+/// Background CSV imports started by staff from the vendor list.
+model DiamondImport {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  vendorId    String   @db.ObjectId
+  status      String   @default("PENDING")
+  imported    Int      @default(0)
+  error       String?
+  startedAt   DateTime @default(now())
+  completedAt DateTime?
+
+  @@index([vendorId, status])
+}
+
+/// A versioned vendor diamond. Only the vendor's active import is served.
+model Diamond {
+  id               String  @id @default(auto()) @map("_id") @db.ObjectId
+  vendorId         String  @db.ObjectId
+  stockId          String
+  sample           Boolean @default(false)
+  status           Float   @default(1.0)
+  ReportNo         String?
+  shape            String?
+  carats           Float?
+  colore           String?
+  clarity          String?
+  cut              String?
+  pol              String?
+  symm             String?
+  flo              String?
+  length           Float?
+  width            Float?
+  height           Float?
+  measurement      String?
+  lwRatio          Float?
+  depth            Float?
+  table            Float?
+  culet            String?
+  certificate      String?
+  girdle           String?
+  eyeClean         String?
+  price             Float?
+  video             String?
+  image             String?
+  pdf               String?
+  mineOfOrigin      String?
+  maxDeliveryDays   Float?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([vendorId, status])
+  @@index([status, stockId])
+  @@index([status, ReportNo, id])
+  @@index([status, shape, id])
+  @@index([status, colore, id])
+  @@index([status, cut, id])
+  @@index([status, certificate, id])
+  @@index([status, vendorId, id])
+  @@index([status, price, id])
+  @@index([status, carats, id])
+  @@index([status, updatedAt, id])
+}

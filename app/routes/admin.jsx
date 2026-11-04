@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { Form, Link, Outlet, isRouteErrorResponse, useLoaderData, useLocation, useRouteError } from "react-router";
 import { requireStaff, serializeStaff } from "../admin-auth.server";
 import { PERMISSIONS, hasPermission } from "../lib/admin/roles";
@@ -24,8 +25,22 @@ const NAV_ITEMS = [
     exact: true,
   },
   {
+    href: "/admin/feeds/vendors",
+    label: "Vendors",
+    icon: "shops",
+    permission: PERMISSIONS.DASHBOARD_VIEW,
+    heading: "Feeds",
+  },
+  {
+    href: "/admin/feeds/diamonds",
+    label: "Diamonds",
+    icon: "dashboard",
+    permission: PERMISSIONS.DASHBOARD_VIEW,
+  },
+  {
+    heading: "Manage",
     href: "/admin/shops",
-    label: "Installed apps",
+    label: "App installed",
     icon: "shops",
     permission: PERMISSIONS.SHOPS_VIEW,
   },
@@ -72,14 +87,14 @@ export default function AdminLayout() {
         </Link>
 
         <nav className="sa-nav" aria-label="Super admin sections">
-          <p className="sa-nav__heading">Manage</p>
           {NAV_ITEMS.filter((item) =>
             hasPermission(staff.role, item.permission),
           ).map((item) => {
             const active = isActivePath(item, location.pathname);
             return (
+              <Fragment key={item.href}>
+                {item.heading && <p className="sa-nav__heading">{item.heading}</p>}
               <Link
-                key={item.href}
                 to={item.href}
                 className={`sa-nav__link${active ? " is-active" : ""}`}
                 aria-current={active ? "page" : undefined}
@@ -89,6 +104,7 @@ export default function AdminLayout() {
                 </span>
                 {item.label}
               </Link>
+              </Fragment>
             );
           })}
         </nav>

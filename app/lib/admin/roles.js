@@ -45,12 +45,14 @@ export const PERMISSIONS = Object.freeze({
   SHOPS_VIEW: "shops:view",
   TICKETS_VIEW: "tickets:view",
   TICKETS_MANAGE: "tickets:manage",
+  VENDORS_MANAGE: "vendors:manage",
   STAFF_MANAGE: "staff:manage",
 });
 
 const ROLE_PERMISSIONS = Object.freeze({
   [ROLES.SUPER_ADMIN]: Object.freeze(Object.values(PERMISSIONS)),
   [ROLES.ADMIN]: Object.freeze([
+    PERMISSIONS.VENDORS_MANAGE,
     PERMISSIONS.DASHBOARD_VIEW,
     PERMISSIONS.SHOPS_VIEW,
     PERMISSIONS.TICKETS_VIEW,
