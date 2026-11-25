@@ -1,0 +1,14 @@
+api_version = "2026-01"
+
+[[extensions]]
+name = "Diamond Builder Sidekick Tools"
+description = "Check Diamond Ring Builder setup status, live storefront URLs, and diamond inventory"
+handle = "diamond-builder-sidekick-tools"
+uid = "3482fed8-8a73-4149-b0d6-28720a601e7bdb3edb87"
+type = "ui_extension"
+
+[[extensions.targeting]]
+target = "admin.app.tools.data"
+module = "./src/index.js"
+tools = "./tools.json"
+instructions = "./instructions.md"

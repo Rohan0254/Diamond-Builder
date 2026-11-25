@@ -7,7 +7,6 @@ import {
   buildDateRange,
   readFilters,
   buildInstallationWhere,
-  buildShopEventWhere,
   eventTypeForInstall,
 } from "./installs.js";
 
@@ -39,10 +38,6 @@ describe("installs: filters", () => {
     const w = buildInstallationWhere({ status: "installed", search: "alpha" });
     assert.equal(w.status, "INSTALLED");
     assert.ok(Array.isArray(w.OR));
-    const ew = buildShopEventWhere({ status: "uninstalled", search: "alpha" });
-    assert.equal(ew.type, "UNINSTALLED");
-    const ew2 = buildShopEventWhere({ status: "installed" });
-    assert.deepEqual(ew2.type, { in: ["INSTALLED", "REINSTALLED"] });
   });
 
   test("event type for install", () => {

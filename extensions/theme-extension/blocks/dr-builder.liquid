@@ -1,0 +1,180 @@
+{% comment %}
+  Diamond Ring Builder — Single Main App Embed (target: body)
+  Matches pages and collections strictly by permanent Shopify IDs (no hardcoded
+  handles, names, or URLs) and loads scripts conditionally with `defer`.
+{% endcomment %}
+
+{% assign wsc_setting = shop.metafields.diamond_builder.store_setting.value %}
+{% assign wsc_enabled = true %}
+{% if wsc_setting != blank and wsc_setting.builderEnabled == false %}
+  {% assign wsc_enabled = false %}
+{% endif %}
+
+{% if block.settings.enabled and wsc_enabled and wsc_setting != blank %}
+  {% assign wsc_ring_id = wsc_setting.ringCollectionNumericId | default: '' | append: '' %}
+  {% assign wsc_pages_meta = wsc_setting.pages %}
+
+  {% assign wsc_is_ring_collection = false %}
+  {% if template.name == 'collection' and wsc_ring_id != blank %}
+    {% assign wsc_col_id_str = collection.id | append: '' %}
+    {% if wsc_col_id_str == wsc_ring_id %}
+      {% assign wsc_is_ring_collection = true %}
+    {% endif %}
+  {% endif %}
+
+  {% assign wsc_is_ring_product = false %}
+  {% if template.name == 'product' and wsc_ring_id != blank %}
+    {% for p_col in product.collections %}
+      {% assign p_col_id_str = p_col.id | append: '' %}
+      {% if p_col_id_str == wsc_ring_id %}
+        {% assign wsc_is_ring_product = true %}
+        {% break %}
+      {% endif %}
+    {% endfor %}
+  {% endif %}
+
+  {% assign wsc_page_type = '' %}
+  {% if template.name == 'page' and wsc_pages_meta != blank %}
+    {% assign wsc_current_page_id = page.id | append: '' %}
+    {% if wsc_current_page_id == wsc_pages_meta.natural.numericId %}
+      {% assign wsc_page_type = 'natural' %}
+    {% elsif wsc_current_page_id == wsc_pages_meta.lab.numericId %}
+      {% assign wsc_page_type = 'lab' %}
+    {% elsif wsc_current_page_id == wsc_pages_meta.gemstones.numericId %}
+      {% assign wsc_page_type = 'gemstones' %}
+    {% elsif wsc_current_page_id == wsc_pages_meta.colored.numericId %}
+      {% assign wsc_page_type = 'colored' %}
+    {% elsif wsc_current_page_id == wsc_pages_meta.detail.numericId %}
+      {% assign wsc_page_type = 'detail' %}
+    {% endif %}
+  {% endif %}
+
+  {% assign wsc_is_cart = false %}
+  {% if template.name == 'cart' %}
+    {% assign wsc_is_cart = true %}
+  {% endif %}
+
+  {% if wsc_is_ring_collection or wsc_is_ring_product or wsc_page_type != blank or wsc_is_cart %}
+    {% assign wsc_ring_url = wsc_setting.ringCollectionUrl | default: '' %}
+    {% if wsc_ring_id != blank %}
+      {% for c in collections %}
+        {% assign cid_str = c.id | append: '' %}
+        {% if cid_str == wsc_ring_id %}
+          {% assign wsc_ring_url = c.url %}
+          {% break %}
+        {% endif %}
+      {% endfor %}
+    {% endif %}
+
+    {% assign wsc_url_natural = wsc_pages_meta.natural.url | default: '' %}
+    {% assign wsc_url_lab = wsc_pages_meta.lab.url | default: '' %}
+    {% assign wsc_url_gemstones = wsc_pages_meta.gemstones.url | default: '' %}
+    {% assign wsc_url_colored = wsc_pages_meta.colored.url | default: '' %}
+    {% assign wsc_url_detail = wsc_pages_meta.detail.url | default: '' %}
+
+    {% for p in pages %}
+      {% assign pid_str = p.id | append: '' %}
+      {% if pid_str == wsc_pages_meta.natural.numericId %}
+        {% assign wsc_url_natural = p.url %}
+      {% elsif pid_str == wsc_pages_meta.lab.numericId %}
+        {% assign wsc_url_lab = p.url %}
+      {% elsif pid_str == wsc_pages_meta.gemstones.numericId %}
+        {% assign wsc_url_gemstones = p.url %}
+      {% elsif pid_str == wsc_pages_meta.colored.numericId %}
+        {% assign wsc_url_colored = p.url %}
+      {% elsif pid_str == wsc_pages_meta.detail.numericId %}
+        {% assign wsc_url_detail = p.url %}
+      {% endif %}
+    {% endfor %}
+
+    {% assign wsc_app_url = block.settings.app_url | strip %}
+    {% if wsc_app_url == blank %}
+      {% assign wsc_app_url = wsc_setting.appUrl | default: '' %}
+    {% endif %}
+
+    {% assign wsc_cats = wsc_setting.enabledCategories %}
+
+    <link rel="stylesheet" href="{{ 'dr-builder.css' | asset_url }}">
+
+    <script>
+      window.__WSC_DR_CONFIG__ = {
+        appUrl: {{ wsc_app_url | json }},
+        shop: {{ shop.permanent_domain | json }},
+        currency: {{ cart.currency.iso_code | default: shop.currency | json }},
+        ringCollectionId: {{ wsc_ring_id | json }},
+        ringCollectionUrl: {{ wsc_ring_url | json }},
+        ringCollectionTitle: {{ wsc_setting.ringCollectionTitle | default: 'Ring Settings' | json }},
+        isRingCollection: {{ wsc_is_ring_collection | json }},
+        isRingProduct: {{ wsc_is_ring_product | json }},
+        isCart: {{ wsc_is_cart | json }},
+        pageType: {{ wsc_page_type | json }},
+        enabledCategories: {
+          natural: {% if wsc_cats != blank and wsc_cats.natural == false %}false{% else %}true{% endif %},
+          lab: {% if wsc_cats != blank and wsc_cats.lab == false %}false{% else %}true{% endif %},
+          gemstones: {% if wsc_cats != blank and wsc_cats.gemstones == false %}false{% else %}true{% endif %},
+          colored: {% if wsc_cats != blank and wsc_cats.colored == false %}false{% else %}true{% endif %}
+        },
+        pageIds: {
+          natural: {{ wsc_pages_meta.natural.numericId | default: '' | json }},
+          lab: {{ wsc_pages_meta.lab.numericId | default: '' | json }},
+          gemstones: {{ wsc_pages_meta.gemstones.numericId | default: '' | json }},
+          colored: {{ wsc_pages_meta.colored.numericId | default: '' | json }},
+          detail: {{ wsc_pages_meta.detail.numericId | default: '' | json }}
+        },
+        pages: {
+          natural: {{ wsc_url_natural | json }},
+          lab: {{ wsc_url_lab | json }},
+          gemstones: {{ wsc_url_gemstones | json }},
+          colored: {{ wsc_url_colored | json }},
+          detail: {{ wsc_url_detail | json }}
+        }
+        {% if template.name == 'product' and wsc_is_ring_product %}
+        ,product: {
+          id: {{ product.id | json }},
+          title: {{ product.title | json }},
+          url: {{ product.url | json }},
+          image: {{ product.featured_image | image_url: width: 400 | json }},
+          selectedVariantId: {{ product.selected_or_first_available_variant.id | json }},
+          variants: [
+            {% for v in product.variants %}
+              {
+                id: {{ v.id | json }},
+                title: {{ v.title | json }},
+                price: {{ v.price | divided_by: 100.0 | json }},
+                available: {{ v.available | json }}
+              }{% unless forloop.last %},{% endunless %}
+            {% endfor %}
+          ]
+        }
+        {% endif %}
+      };
+    </script>
+
+    <script src="{{ 'byor-strip.js' | asset_url }}" defer></script>
+    {% if wsc_page_type != blank %}
+      <script src="{{ 'diamond-filters.js' | asset_url }}" defer></script>
+      <script src="{{ 'diamond-view.js' | asset_url }}" defer></script>
+    {% endif %}
+  {% endif %}
+{% endif %}
+
+{% schema %}
+{
+  "name": "Diamond Ring Builder",
+  "target": "body",
+  "settings": [
+    {
+      "type": "checkbox",
+      "id": "enabled",
+      "label": "Enable Diamond Ring Builder",
+      "default": true
+    },
+    {
+      "type": "text",
+      "id": "app_url",
+      "label": "Custom App URL Override (optional)",
+      "info": "Leave blank to automatically use the app URL synced from StoreSetting."
+    }
+  ]
+}
+{% endschema %}

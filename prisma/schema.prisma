@@ -61,22 +61,6 @@ model AppSubscription {
   @@index([shopifySubscriptionId])
 }
 
-/// Latest script-verification result per shop (Setup page). `scripts` is a
-/// JSON array of `{ key, status, message }`; `overallStatus` is one of
-/// `complete | incomplete | unknown`. `shop` is always derived from the
-/// authenticated session, never from the client.
-model SetupVerification {
-  id             String   @id @default(auto()) @map("_id") @db.ObjectId
-  shop           String
-  scripts        Json
-  overallStatus  String
-  lastVerifiedAt DateTime
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  @@index([shop, lastVerifiedAt])
-}
-
 /// A support request submitted through the Help page. `ticketId` is the
 /// human-friendly reference shown to the merchant (e.g. `SS-XXXXXX`); `shop`
 /// is always derived from the authenticated session, never from the client.
@@ -189,24 +173,22 @@ model ShopInstallation {
   @@index([status, lastEventAt])
 }
 
-/// Append-only install / reinstall / uninstall history for the super admin log
-/// view. Every lifecycle change appends one row; rows are never mutated, except
-/// for the PII scrub done by the `shop/redact` compliance webhook, which is what
-/// makes the log trustworthy. `type` is INSTALLED | REINSTALLED | UNINSTALLED.
-model ShopEvent {
-  id         String    @id @default(auto()) @map("_id") @db.ObjectId
-  shop       String
-  type       String
-  at         DateTime  @default(now())
-  name       String?
-  email      String?
-  domain     String?
-  detail     String?
-  redactedAt DateTime?
-  createdAt  DateTime  @default(now())
-
-  @@index([shop, at])
-  @@index([type, at])
+/// Per-merchant Diamond Builder configuration & ID-driven page/collection mapping.
+/// `shop` is always derived from the authenticated Shopify session.
+model StoreSetting {
+  id                      String    @id @default(auto()) @map("_id") @db.ObjectId
+  shop                    String    @unique
+  builderEnabled          Boolean   @default(true)
+  ringCollectionId        String?
+  ringCollectionNumericId String?
+  ringCollectionHandle    String?
+  ringCollectionTitle     String?
+  enabledCategories       Json?
+  pages                   Json?
+  autoCreatePages         Boolean   @default(true)
+  pagesProvisionedAt      DateTime?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
 }
 
 /// Subscription plans (pricing tiers). This collection is the source of truth

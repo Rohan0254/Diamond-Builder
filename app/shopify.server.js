@@ -7,6 +7,8 @@ import {
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
 import prisma from "./db.server";
 import { syncShopProfile } from "./shop-profile.server";
+import { ensureStoreSetting } from "./data/store-setting.js";
+import { ensureBuilderPages } from "./data/shopify-pages.js";
 
 const shopify = shopifyApp({
   apiKey: process.env.SHOPIFY_API_KEY,
@@ -25,9 +27,11 @@ const shopify = shopifyApp({
   },
   hooks: {
     // Runs on install (and re-auth). Best-effort: failures are logged inside
-    // syncShopProfile and can never break the install flow.
+    // syncShopProfile and ensureBuilderPages and can never break the install flow.
     afterAuth: async ({ session, admin }) => {
       await syncShopProfile({ shop: session.shop, admin });
+      await ensureStoreSetting(session.shop);
+      await ensureBuilderPages({ admin, shop: session.shop });
     },
   },
   ...(process.env.SHOP_CUSTOM_DOMAIN

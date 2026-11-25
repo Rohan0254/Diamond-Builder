@@ -1,24 +1,13 @@
-// Install / uninstall tracking for the super admin panel.
-//
-// The app never recorded this before: `Session` rows carry no timestamps and are
-// deleted when a merchant uninstalls, so "who installed, when, and did they
-// leave?" had no answer. Two collections fix that:
-//
-//   ShopInstallation  current state, one row per shop (keyed by myshopify domain)
-//   ShopEvent         append-only lifecycle history (installed/reinstalled/uninstalled)
+// Install / uninstall tracking for the super admin panel backed by `ShopInstallation`.
 //
 // Writes happen from the `afterAuth` install hook and the `app/uninstalled`
-// webhook. Everything here is written to be safe to call from those flows:
-// a failure is logged and returns null rather than breaking an install, and
-// repeat calls are idempotent — a re-auth refreshes the stored shop details but
-// never appends a second "installed" event.
+// webhook. Everything here is safe to call from those flows: failures are logged
+// and return null rather than breaking an install, and repeat calls are idempotent.
 
 import prisma from "./db.server";
 import {
   INSTALL_STATUS,
-  SHOP_EVENT_TYPE,
   buildInstallationWhere,
-  buildShopEventWhere,
   normalizeShopDomain,
 } from "./lib/admin/installs";
 
@@ -35,14 +24,7 @@ function definedFields(source) {
 
 /**
  * Records that a shop installed the app (or came back after uninstalling).
- *
- * Always safe to call: returns `null` when the shop is missing or the write
- * fails, and never throws, so it cannot break `afterAuth`.
- *
- * @param {object} params
- * @param {string} params.shop myshopify domain
- * @param {object|null} [params.profile] normalized ShopProfile record, when available
- * @param {Date} [params.now]
+ * Always safe to call: returns `null` when the shop is missing or fails.
  */
 export async function recordShopInstalled({
   shop,
@@ -68,9 +50,8 @@ export async function recordShopInstalled({
       shopifyShopId: profile?.shopifyShopId ?? shopifyShopId,
     });
 
-    // First ever install for this shop.
     if (!existing) {
-      const installation = await prisma.shopInstallation.create({
+      return prisma.shopInstallation.create({
         data: {
           shop: shopDomain,
           status: INSTALL_STATUS.INSTALLED,
@@ -79,15 +60,10 @@ export async function recordShopInstalled({
           lastEventAt: now,
         },
       });
-      await prisma.shopEvent.create({
-        data: { shop: shopDomain, type: SHOP_EVENT_TYPE.INSTALLED, at: now, ...fields },
-      });
-      return installation;
     }
 
-    // Back after an uninstall: open a new cycle.
     if (existing.status === INSTALL_STATUS.UNINSTALLED) {
-      const installation = await prisma.shopInstallation.update({
+      return prisma.shopInstallation.update({
         where: { shop: shopDomain },
         data: {
           ...fields,
@@ -97,19 +73,8 @@ export async function recordShopInstalled({
           reinstallCount: { increment: 1 },
         },
       });
-      await prisma.shopEvent.create({
-        data: {
-          shop: shopDomain,
-          type: SHOP_EVENT_TYPE.REINSTALLED,
-          at: now,
-          ...fields,
-        },
-      });
-      return installation;
     }
 
-    // Already installed (e.g. a re-auth or a scope change): refresh what we
-    // know about the shop, but do not claim a new install.
     if (Object.keys(fields).length === 0) return existing;
     return prisma.shopInstallation.update({
       where: { shop: shopDomain },
@@ -122,8 +87,7 @@ export async function recordShopInstalled({
 }
 
 /**
- * Records that a shop uninstalled the app. Repeat deliveries are ignored, so a
- * webhook retry can never add a second "uninstalled" row.
+ * Records that a shop uninstalled the app. Repeat deliveries are ignored.
  */
 export async function recordShopUninstalled({
   shop,
@@ -141,8 +105,6 @@ export async function recordShopUninstalled({
     });
     if (existing?.status === INSTALL_STATUS.UNINSTALLED) return existing;
 
-    // Fall back to the stored profile so the row keeps a name/email even when
-    // the app is removed before any install event was recorded.
     const profile = existing
       ? null
       : await prisma.shopProfile
@@ -159,11 +121,8 @@ export async function recordShopUninstalled({
         profile?.shopifyShopId,
     });
 
-    // A shop can uninstall before any install was recorded (pre-existing
-    // merchants, or a delivery that raced the install hook): open the row with
-    // what the payload gives us instead of failing.
-    const installation = existing
-      ? await prisma.shopInstallation.update({
+    return existing
+      ? prisma.shopInstallation.update({
           where: { shop: shopDomain },
           data: {
             ...fields,
@@ -172,7 +131,7 @@ export async function recordShopUninstalled({
             lastEventAt: now,
           },
         })
-      : await prisma.shopInstallation.create({
+      : prisma.shopInstallation.create({
           data: {
             shop: shopDomain,
             status: INSTALL_STATUS.UNINSTALLED,
@@ -182,19 +141,6 @@ export async function recordShopUninstalled({
             lastEventAt: now,
           },
         });
-
-    await prisma.shopEvent.create({
-      data: {
-        shop: shopDomain,
-        type: SHOP_EVENT_TYPE.UNINSTALLED,
-        at: now,
-        name: installation.name,
-        email: installation.email,
-        domain: installation.domain,
-        detail: existing ? null : "Uninstalled before an install was recorded",
-      },
-    });
-    return installation;
   } catch (error) {
     console.error(
       `[installs] could not record the uninstall of ${shopDomain}`,
@@ -218,14 +164,11 @@ export async function getInstallStats({ now = new Date() } = {}) {
     prisma.shopInstallation.count(),
     prisma.shopInstallation.count({ where: { status: INSTALL_STATUS.INSTALLED } }),
     prisma.shopInstallation.count({ where: { status: INSTALL_STATUS.UNINSTALLED } }),
-    prisma.shopEvent.count({
-      where: {
-        type: { in: [SHOP_EVENT_TYPE.INSTALLED, SHOP_EVENT_TYPE.REINSTALLED] },
-        at: { gte: weekAgo },
-      },
+    prisma.shopInstallation.count({
+      where: { status: INSTALL_STATUS.INSTALLED, lastEventAt: { gte: weekAgo } },
     }),
-    prisma.shopEvent.count({
-      where: { type: SHOP_EVENT_TYPE.UNINSTALLED, at: { gte: weekAgo } },
+    prisma.shopInstallation.count({
+      where: { status: INSTALL_STATUS.UNINSTALLED, uninstalledAt: { gte: weekAgo } },
     }),
     prisma.shopInstallation.count({ where: { reinstallCount: { gt: 0 } } }),
   ]);
@@ -240,34 +183,27 @@ export async function getInstallStats({ now = new Date() } = {}) {
   };
 }
 
-/** Recent lifecycle events for the dashboard activity list. */
-export async function listRecentShopEvents(take = 8) {
-  return prisma.shopEvent.findMany({
-    orderBy: { at: "desc" },
+/** Recent shop installation changes for the dashboard activity list. */
+export async function listRecentInstallations(take = 8) {
+  return prisma.shopInstallation.findMany({
+    orderBy: { lastEventAt: "desc" },
     take,
   });
 }
 
-/**
- * Copies shops that were installed before install tracking existed into the new
- * collections, so the panel shows the existing merchant base instead of an empty
- * list. Idempotent: only shops without a `ShopInstallation` row are created, and
- * the work is cached for the life of the process.
- */
 let backfillPromise = null;
 
 export function ensureInstallBackfill() {
   if (!backfillPromise) {
     backfillPromise = runInstallBackfill().catch((error) => {
       console.error("[installs] backfill failed", error);
-      backfillPromise = null; // allow a retry on the next request
+      backfillPromise = null;
       return { scanned: 0, created: 0, failed: true };
     });
   }
   return backfillPromise;
 }
 
-/** Performs the backfill described above. Exported for the tests/tools. */
 export async function runInstallBackfill({ now = new Date() } = {}) {
   const [profiles, existing] = await Promise.all([
     prisma.shopProfile.findMany({ orderBy: { installedAt: "asc" } }),
@@ -296,18 +232,8 @@ export async function runInstallBackfill({ now = new Date() } = {}) {
           lastEventAt: installedAt,
         },
       });
-      await prisma.shopEvent.create({
-        data: {
-          shop: profile.shop,
-          type: SHOP_EVENT_TYPE.INSTALLED,
-          at: installedAt,
-          ...fields,
-          detail: "Recovered from the stored shop profile",
-        },
-      });
       created += 1;
     } catch (error) {
-      // A unique-key race with another instance simply means the row exists.
       console.error(`[installs] backfill skipped ${profile.shop}`, error);
     }
   }
@@ -333,29 +259,4 @@ export async function listInstallations({
     prisma.shopInstallation.count({ where }),
   ]);
   return { rows, total };
-}
-
-/** Paginated lifecycle log plus the total matching the filters. */
-export async function listShopEvents({
-  filters,
-  page = 1,
-  pageSize = 25,
-} = {}) {
-  const where = buildShopEventWhere(filters);
-  const skip = Math.max(0, (page - 1) * pageSize);
-  const [rows, total] = await Promise.all([
-    prisma.shopEvent.findMany({
-      where,
-      orderBy: { at: "desc" },
-      skip,
-      take: pageSize,
-    }),
-    prisma.shopEvent.count({ where }),
-  ]);
-  return { rows, total };
-}
-
-/** Most recent lifecycle rows, for the dashboard's activity list. */
-export async function listRecentShopEvents2(take = 8) {
-  return prisma.shopEvent.findMany({ orderBy: { at: "desc" }, take });
 }

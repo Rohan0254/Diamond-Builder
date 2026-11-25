@@ -1,0 +1,7 @@
+{
+  "$schema": "https://extensions.shopifycdn.com/shopifycloud/schemas/v1/intent.json",
+  "inputSchema": {
+    "type": "object",
+    "$ref": "https://extensions.shopifycdn.com/shopifycloud/schemas/v1/application/collection-configuration.json"
+  }
+}

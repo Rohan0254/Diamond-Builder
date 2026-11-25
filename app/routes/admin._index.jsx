@@ -2,31 +2,25 @@ import { Link, useLoaderData } from "react-router";
 import prisma from "../db.server";
 import { requireStaff } from "../admin-auth.server";
 import { PERMISSIONS } from "../lib/admin/roles";
-import { SHOP_EVENT_LABELS, SHOP_EVENT_TONES } from "../lib/admin/installs";
+import { INSTALL_STATUS_LABELS } from "../lib/admin/installs";
 import { TICKET_STATUS_LABELS, TICKET_STATUS_TONES } from "../lib/support";
 import { formatNumber, formatRelativeTime } from "../lib/admin/format";
 import {
   ensureInstallBackfill,
   getInstallStats,
-  listRecentShopEvents,
+  listRecentInstallations,
 } from "../installs.server";
 import AdminIcon from "../components/admin/AdminIcon.jsx";
 
-// Dashboard for the super admin panel: `/admin`.
-//
-// Two 200x150 metric tiles (installed apps, support tickets) plus the most recent
-// install lifecycle and ticket activity. Counts are read from the database on
-// every load — nothing is cached or invented.
-
 export const meta = () => [{ title: "Dashboard · Diamond Builder Super Admin" }];
 
-function serializeEvent(event) {
+function serializeInstall(row) {
   return {
-    id: event.id,
-    shop: event.shop,
-    type: event.type,
-    at: (event.at ?? event.createdAt)?.toISOString?.() ?? null,
-    name: event.name ?? null,
+    id: row.id,
+    shop: row.shop,
+    status: row.status,
+    at: (row.lastEventAt ?? row.installedAt ?? row.createdAt)?.toISOString?.() ?? null,
+    name: row.name ?? null,
   };
 }
 
@@ -49,14 +43,14 @@ export const loader = async ({ request }) => {
 
   const [
     installStats,
-    recentEvents,
+    recentInstalls,
     ticketTotal,
     ticketsOpen,
     ticketsInProgress,
     recentTickets,
   ] = await Promise.all([
     getInstallStats(),
-    listRecentShopEvents(8),
+    listRecentInstallations(8),
     prisma.supportTicket.count(),
     prisma.supportTicket.count({ where: { status: "OPEN" } }),
     prisma.supportTicket.count({ where: { status: "IN_PROGRESS" } }),
@@ -65,7 +59,7 @@ export const loader = async ({ request }) => {
 
   return {
     installStats,
-    recentEvents: recentEvents.map(serializeEvent),
+    recentInstalls: recentInstalls.map(serializeInstall),
     tickets: {
       total: ticketTotal,
       open: ticketsOpen,
@@ -77,7 +71,7 @@ export const loader = async ({ request }) => {
 };
 
 export default function AdminDashboard() {
-  const { installStats, recentEvents, tickets, recentTickets } = useLoaderData();
+  const { installStats, recentInstalls, tickets, recentTickets } = useLoaderData();
 
   return (
     <>
@@ -136,28 +130,28 @@ export default function AdminDashboard() {
           </Link>
         </div>
 
-        {recentEvents.length === 0 ? (
-          <p className="sa-empty">No install or uninstall events recorded yet.</p>
+        {recentInstalls.length === 0 ? (
+          <p className="sa-empty">No install or uninstall activity recorded yet.</p>
         ) : (
           <ul className="sa-list">
-            {recentEvents.map((event) => (
-              <li key={event.id} className="sa-list__item">
+            {recentInstalls.map((row) => (
+              <li key={row.id} className="sa-list__item">
                 <span>
-                  <span className="sa-mono">{event.shop}</span>
-                  {event.name ? (
-                    <span className="sa-muted"> · {event.name}</span>
+                  <span className="sa-mono">{row.shop}</span>
+                  {row.name ? (
+                    <span className="sa-muted"> · {row.name}</span>
                   ) : null}
                 </span>
                 <span className="sa-row sa-nowrap">
                   <span
                     className={`sa-badge sa-badge--${
-                      SHOP_EVENT_TONES[event.type] ?? "neutral"
+                      row.status === "INSTALLED" ? "positive" : "critical"
                     }`}
                   >
-                    {SHOP_EVENT_LABELS[event.type] ?? event.type}
+                    {INSTALL_STATUS_LABELS[row.status] ?? row.status}
                   </span>
                   <span className="sa-list__meta">
-                    {formatRelativeTime(event.at)}
+                    {formatRelativeTime(row.at)}
                   </span>
                 </span>
               </li>

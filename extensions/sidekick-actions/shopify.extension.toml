@@ -1,0 +1,17 @@
+[[extensions]]
+name = "Configure Ring Builder Settings"
+description = "Open Diamond Ring Builder Dashboard and update ring collection, builder toggle, or visible diamond categories"
+handle = "diamond-builder-open-settings"
+uid = "af4a1595-721d-8fc0-2cde-6974df2157efcc23f54c"
+type = "admin_link"
+
+[[extensions.targeting]]
+target = "admin.app.intent.link"
+url = "/app"
+tools = "./tools.json"
+instructions = "./instructions.md"
+
+[[extensions.targeting.intents]]
+type = "application/collection-configuration"
+action = "edit"
+schema = "./intent-schema.json"

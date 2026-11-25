@@ -1,0 +1,26 @@
+[
+  {
+    "name": "get_builder_ui_state",
+    "description": "Reads current Ring Collection selection, builder status, visible diamond categories, and available collections.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "configure_builder_settings",
+    "description": "Checks/unchecks visible diamond categories (natural, lab, gemstones, colored), toggles builderEnabled, or selects a Ring Collection.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "natural": { "type": "boolean", "description": "Show/hide Natural Diamonds" },
+        "lab": { "type": "boolean", "description": "Show/hide Lab Grown" },
+        "gemstones": { "type": "boolean", "description": "Show/hide Gemstones" },
+        "colored": { "type": "boolean", "description": "Show/hide Colored" },
+        "builderEnabled": { "type": "boolean", "description": "Enable/pause builder" },
+        "ringCollectionTitle": { "type": "string", "description": "Collection name" },
+        "saveNow": { "type": "boolean", "description": "Save now (default true)" }
+      }
+    }
+  }
+]

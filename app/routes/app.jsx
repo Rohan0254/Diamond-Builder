@@ -4,7 +4,6 @@ import {
   redirect,
   useLoaderData,
   useLocation,
-  useNavigate,
   useNavigation,
   useRouteError,
 } from "react-router";
@@ -16,13 +15,10 @@ import {
   syncSubscriptionFromChargeId,
 } from "../billing.server";
 import { ensureShopProfile } from "../shop-profile.server";
-import { getLatestSetupVerification } from "../setup.server";
-import { isTerminalStatus } from "../lib/billing";
+import { ensureStoreSetting, getStoreSetting } from "../data/store-setting.js";
+import { ensureBuilderPages } from "../data/shopify-pages.js";
 import NavLoadingShimmer from "../components/NavLoadingShimmer.jsx";
 import { SHELL_CSS } from "../lib/shell-styles.js";
-
-// Pages a shop can reach before it has selected a plan.
-const NO_PLAN_PATHS = new Set(["/app/plan", "/app/help"]);
 
 
 /**
@@ -73,61 +69,37 @@ export const loader = async ({ request }) => {
     console.error("Failed to reconcile subscription", error);
   }
 
-  // Capture / refresh the merchant's shop profile. The `afterAuth` hook does
-  // this on install; this also covers shops installed before the feature and
-  // keeps the record fresh. Best-effort — never blocks the page.
+  // Capture / refresh the merchant's shop profile and ensure storefront pages
+  // once (only if `pagesProvisionedAt` is still unset). Best-effort — never blocks.
   try {
     await ensureShopProfile({ shop: session.shop, admin });
-  } catch (error) {
-    console.error("Failed to sync shop profile", error);
-  }
-
-  const status = subscription?.status ?? null;
-  // A plan counts as "taken" as soon as a pending or active subscription exists.
-  // Only declined/cancelled/expired records fall back to the two-tab state.
-  const hasPlan = Boolean(subscription) && !isTerminalStatus(status);
-
-  // Shops without a plan only get Plan + Help; anything else bounces to Plan.
-  if (!hasPlan && !NO_PLAN_PATHS.has(pathname)) {
-    throw redirect(`/app/plan${url.search}`);
-  }
-
-  // Setup is a one-time step. Until the script is verified, the dashboard isn't
-  // available: Home is hidden from the nav and opening the app (the dashboard)
-  // lands on Setup instead.
-  let setupComplete = false;
-  if (hasPlan) {
-    try {
-      const record = await getLatestSetupVerification(session.shop);
-      setupComplete = record?.overallStatus === "complete";
-    } catch (error) {
-      console.error("Failed to check setup status", error);
+    await ensureStoreSetting(session.shop);
+    const storeSetting = await getStoreSetting(session.shop);
+    const hasAllPages = ["natural", "lab", "gemstones", "colored", "detail"].every(
+      (key) => Boolean(storeSetting.pages?.[key]?.numericId),
+    );
+    if (!storeSetting.pagesProvisionedAt || !hasAllPages) {
+      await ensureBuilderPages({ admin, shop: session.shop });
     }
+  } catch (error) {
+    console.error("Failed to sync shop profile or builder pages", error);
   }
 
-  if (hasPlan && !setupComplete && pathname === "/app") {
-    throw redirect(`/app/setup${url.search}`);
-  }
-
-  // Returned from Shopify's approval page: now that the charge is saved, land on
-  // the one-time Setup step. The return URL already points here for a first
-  // activation; this also guarantees Setup is where the merchant lands after
-  // paying (and recovers the case where the embedded reload came back on another
-  // `/app/*` page).
-  if (chargeId && hasPlan && pathname !== "/app/setup") {
-    throw redirect(`/app/setup${dropChargeId(url.search)}`);
+  // Returned from Shopify's billing approval page: drop `charge_id` and land on
+  // the Dashboard so the merchant can complete onboarding steps.
+  if (chargeId && subscription && pathname !== "/app") {
+    throw redirect(`/app${dropChargeId(url.search)}`);
   }
 
   // eslint-disable-next-line no-undef
   const apiKey = process.env.SHOPIFY_API_KEY || "";
 
-  return { apiKey, authError: null, hasPlan, setupComplete };
+  return { apiKey, authError: null };
 };
 
 export default function App() {
-  const { apiKey, authError, hasPlan, setupComplete } = useLoaderData();
+  const { apiKey, authError } = useLoaderData();
   const location = useLocation();
-  const navigate = useNavigate();
   const navigation = useNavigation();
 
   // The control a page load is running for. While it is set, that control
@@ -235,24 +207,6 @@ export default function App() {
 
   useEffect(() => () => window.clearTimeout(safetyTimer.current), []);
 
-  // Safety net for the embedded load: if the dashboard is rendered while the
-  // script is still unverified (e.g. the App Bridge bootstrap skipped the server
-  // redirect), pivot to Setup client-side. A billing return (`charge_id`) always
-  // lands on Setup once the plan is recognised. Once verified this is a no-op.
-  useEffect(() => {
-    const returningFromApproval = new URLSearchParams(location.search).has(
-      "charge_id",
-    );
-    const shouldSetup =
-      hasPlan &&
-      location.pathname !== "/app/setup" &&
-      (returningFromApproval ||
-        (location.pathname === "/app" && !setupComplete));
-    if (shouldSetup) {
-      navigate("/app/setup", { replace: true });
-    }
-  }, [hasPlan, setupComplete, location.pathname, location.search, navigate]);
-
   // Plain HTML fallback: the Polaris web components need AppProvider context,
   // so we don't render the app chrome when we couldn't authenticate.
   if (authError) {
@@ -297,9 +251,8 @@ export default function App() {
     <AppProvider embedded apiKey={apiKey}>
       <style>{SHELL_CSS}</style>
       <s-app-nav>
-        {hasPlan && setupComplete && <s-link href="/app">Dashboard</s-link>}
+        <s-link href="/app">Dashboard</s-link>
         <s-link href="/app/plan">Plan</s-link>
-        {hasPlan && <s-link href="/app/setup">Setup</s-link>}
         <s-link href="/app/help">Help</s-link>
       </s-app-nav>
       <NavLoadingShimmer target={pendingTarget} />

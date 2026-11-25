@@ -8,25 +8,25 @@ export const FAQ_ITEMS = [
     id: "setup",
     question: "How do I set up Diamond Builder?",
     answer:
-      "Follow the three steps on the Setup page: copy each script into the location described on its card, save and publish any theme changes, then click Verify Setup. The app reports the verification result for each script individually.",
+      "Follow the two onboarding steps on the Dashboard: enable the Diamond Ring Builder App Embed in your live Shopify theme and verify it, then select your primary Ring Collection and save your settings.",
   },
   {
     id: "not-detected",
-    question: "Why is my script not being detected?",
+    question: "Why is my theme embed not detected?",
     answer:
-      "Make sure the script is installed in the correct location, saved, and enabled where applicable. Some theme or storefront changes may take time to become visible. Run verification again after checking your installation. If your storefront is password protected, automatic verification cannot read it: make the store publicly visible, at least temporarily, to verify.",
+      "Make sure you turned on the Diamond Ring Builder toggle inside Shopify Theme Customizer -> App Embeds and clicked Save in the theme editor, then click Check Embed Status on the Dashboard.",
   },
   {
     id: "theme-changes",
-    question: "Will Diamond Builder change my Shopify theme?",
+    question: "Will Diamond Builder edit my Shopify theme files?",
     answer:
-      "Diamond Builder does not edit or replace your theme files. The scripts on the Setup page are installed by you into your theme and load additional JavaScript; the app itself does not modify your theme's code. As with any third-party script, review what it does before installing it.",
+      "No. Diamond Builder uses an official Shopify Theme App Embed block, so your theme templates stay untouched and you can enable or disable it anytime from App Embeds.",
   },
   {
     id: "check-optimization",
-    question: "How can I check whether optimization is working?",
+    question: "How can I check if my storefront builder is live?",
     answer:
-      "Open the Setup page and run Verify Setup: a verified result confirms the scripts are present on your storefront. Performance analytics and recommendations appear in the app's dashboard as they become available, so check back after your scripts are verified.",
+      "Check the onboarding banner and live page URLs on your Dashboard. Once Step 1 (Theme App Embed) and Step 2 (Ring Collection) are complete, click any live storefront URL to test the Build Your Own Ring flow.",
   },
   {
     id: "contact-support",

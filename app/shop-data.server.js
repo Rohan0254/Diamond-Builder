@@ -10,7 +10,7 @@
 //   Session            — offline/online session records for the shop
 //   AppSubscription    — the local billing mirror (no tokens or payment data)
 //   ShopProfile        — the merchant's own store info from the Admin API
-//   SetupVerification  — the latest script-verification snapshot
+//   StoreSetting       — the merchant's Ring Collection & builder settings
 //   SupportTicket      — support requests the merchant submitted in the app
 //
 
@@ -40,7 +40,7 @@ export async function redactShopData(shop) {
     ["session", prisma.session],
     ["appSubscription", prisma.appSubscription],
     ["shopProfile", prisma.shopProfile],
-    ["setupVerification", prisma.setupVerification],
+    ["storeSetting", prisma.storeSetting],
     ["supportTicket", prisma.supportTicket],
   ];
 

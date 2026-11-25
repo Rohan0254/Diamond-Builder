@@ -89,29 +89,6 @@ export function buildInstallationWhere({ status, search, from, to } = {}) {
   return where;
 }
 
-/** Prisma `where` for the lifecycle log (`ShopEvent`). */
-export function buildShopEventWhere({ status, search, from, to } = {}) {
-  const where = {};
-  const normalizedStatus = normalizeInstallStatusFilter(status);
-  if (normalizedStatus === "installed") {
-    where.type = { in: [SHOP_EVENT_TYPE.INSTALLED, SHOP_EVENT_TYPE.REINSTALLED] };
-  } else if (normalizedStatus === "uninstalled") {
-    where.type = SHOP_EVENT_TYPE.UNINSTALLED;
-  }
-  const term = normalizeSearch(search);
-  if (term) {
-    where.OR = [
-      { shop: { contains: term } },
-      { name: { contains: term } },
-      { email: { contains: term } },
-      { domain: { contains: term } },
-    ];
-  }
-  const range = buildDateRange(from, to);
-  if (range) where.at = range;
-  return where;
-}
-
 /**
  * Which lifecycle event an install represents: the first one, or a return after
  * an uninstall. Takes the *previous* status (or undefined when unknown).

@@ -1,0 +1,31 @@
+[
+  {
+    "name": "get_diamond_builder_status",
+    "description": "Gets Diamond Ring Builder setup status, theme embed status, ring collection, visible diamond categories, inventory counts, and live storefront URLs.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "search_diamonds",
+    "description": "Searches active diamonds by category, shape, cut, color, clarity, lab, carat range, and price range.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "category": { "type": "string", "enum": ["natural", "lab", "gemstones", "colored"] },
+        "shape": { "type": "string", "description": "Round, Oval, Emerald, etc." },
+        "cut": { "type": "string" },
+        "color": { "type": "string" },
+        "clarity": { "type": "string" },
+        "certificate": { "type": "string", "description": "GIA, IGI, GCAL" },
+        "minCarat": { "type": "number" },
+        "maxCarat": { "type": "number" },
+        "minPrice": { "type": "number" },
+        "maxPrice": { "type": "number" },
+        "sort": { "type": "string", "enum": ["price_asc", "price_desc", "carat_desc", "carat_asc"] },
+        "limit": { "type": "integer", "description": "Max 10" }
+      }
+    }
+  }
+]

@@ -26,7 +26,6 @@ import {
   getPlan,
 } from "../lib/plans";
 import { getPlans, getPublicPlanList } from "../plans.server";
-import { getLatestSetupVerification } from "../setup.server";
 import {
   buildEmbeddedReturnUrl,
   computeTrialDays,
@@ -250,19 +249,9 @@ async function handleSelect({ form, request, admin, session }) {
   const isPlanChange = Boolean(activePlanKey);
   const trialDays = computeTrialDays(hasBillingHistory, plan.trialDays);
 
-  // Where Shopify sends the merchant after approval. A first-time activation
-  // goes to the one-time Setup step; a shop that already completed Setup (for
-  // example a later plan change) goes back to the Plan page. The destination is
-  // baked into the return URL so no extra redirect is needed when the embedded
-  // app reloads.
-  let setupComplete = false;
-  try {
-    const record = await getLatestSetupVerification(session.shop);
-    setupComplete = record?.overallStatus === "complete";
-  } catch (error) {
-    console.error("Failed to read setup status", error);
-  }
-
+  // Where Shopify sends the merchant after approval: a first-time activation
+  // goes to the Dashboard so they can connect their Ring Collection; a later
+  // plan change returns to Plan.
   let result;
   try {
     result = await createShopifySubscription(admin, {
@@ -271,7 +260,7 @@ async function handleSelect({ form, request, admin, session }) {
         request,
         session.shop,
         String(form.get("returnSearch") ?? ""),
-        setupComplete ? "/app/plan" : "/app/setup",
+        isPlanChange ? "/app/plan" : "/app",
       ),
       test: isTestBillingMode(),
       trialDays,

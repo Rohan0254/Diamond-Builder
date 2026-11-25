@@ -1,10 +1,7 @@
 {
-  "ratings": {
-    "stars": {
-      "label": "Ratings"
-    },
-    "home": {
-      "recommendationText": "Recommended Product!"
-    }
+  "builder": {
+    "name": "Diamond Ring Builder",
+    "chooseSetting": "Choose This Setting",
+    "chooseDiamond": "Choose This Diamond"
   }
 }
