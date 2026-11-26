@@ -11,6 +11,7 @@
 //   AppSubscription    — the local billing mirror (no tokens or payment data)
 //   ShopProfile        — the merchant's own store info from the Admin API
 //   StoreSetting       — the merchant's Ring Collection & builder settings
+//   ShopifyDiamondMap  — cached links between catalog diamonds & JIT Shopify products
 //   SupportTicket      — support requests the merchant submitted in the app
 //
 
@@ -41,6 +42,7 @@ export async function redactShopData(shop) {
     ["appSubscription", prisma.appSubscription],
     ["shopProfile", prisma.shopProfile],
     ["storeSetting", prisma.storeSetting],
+    ...(prisma?.shopifyDiamondMap ? [["shopifyDiamondMap", prisma.shopifyDiamondMap]] : []),
     ["supportTicket", prisma.supportTicket],
   ];
 

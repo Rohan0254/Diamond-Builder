@@ -54,47 +54,84 @@
     {% assign wsc_is_cart = true %}
   {% endif %}
 
-  {% if wsc_is_ring_collection or wsc_is_ring_product or wsc_page_type != blank or wsc_is_cart %}
-    {% assign wsc_ring_url = wsc_setting.ringCollectionUrl | default: '' %}
-    {% if wsc_ring_id != blank %}
-      {% for c in collections %}
-        {% assign cid_str = c.id | append: '' %}
-        {% if cid_str == wsc_ring_id %}
-          {% assign wsc_ring_url = c.url %}
-          {% break %}
-        {% endif %}
-      {% endfor %}
+  {% assign wsc_is_diamond_product = false %}
+  {% if template.name == 'product' %}
+    {% if product.vendor == 'Diamond Builder By WS' or product.metafields.diamond_builder.diamond_id != blank %}
+      {% assign wsc_is_diamond_product = true %}
     {% endif %}
+  {% endif %}
 
-    {% assign wsc_url_natural = wsc_pages_meta.natural.url | default: '' %}
-    {% assign wsc_url_lab = wsc_pages_meta.lab.url | default: '' %}
-    {% assign wsc_url_gemstones = wsc_pages_meta.gemstones.url | default: '' %}
-    {% assign wsc_url_colored = wsc_pages_meta.colored.url | default: '' %}
-    {% assign wsc_url_detail = wsc_pages_meta.detail.url | default: '' %}
-
-    {% for p in pages %}
-      {% assign pid_str = p.id | append: '' %}
-      {% if pid_str == wsc_pages_meta.natural.numericId %}
-        {% assign wsc_url_natural = p.url %}
-      {% elsif pid_str == wsc_pages_meta.lab.numericId %}
-        {% assign wsc_url_lab = p.url %}
-      {% elsif pid_str == wsc_pages_meta.gemstones.numericId %}
-        {% assign wsc_url_gemstones = p.url %}
-      {% elsif pid_str == wsc_pages_meta.colored.numericId %}
-        {% assign wsc_url_colored = p.url %}
-      {% elsif pid_str == wsc_pages_meta.detail.numericId %}
-        {% assign wsc_url_detail = p.url %}
+  {% assign wsc_ring_url = wsc_setting.ringCollectionUrl | default: '' %}
+  {% if wsc_ring_id != blank %}
+    {% for c in collections %}
+      {% assign cid_str = c.id | append: '' %}
+      {% if cid_str == wsc_ring_id %}
+        {% assign wsc_ring_url = c.url %}
+        {% break %}
       {% endif %}
     {% endfor %}
+  {% endif %}
 
+  {% assign wsc_url_natural = wsc_pages_meta.natural.url | default: '' %}
+  {% assign wsc_url_lab = wsc_pages_meta.lab.url | default: '' %}
+  {% assign wsc_url_gemstones = wsc_pages_meta.gemstones.url | default: '' %}
+  {% assign wsc_url_colored = wsc_pages_meta.colored.url | default: '' %}
+  {% assign wsc_url_detail = wsc_pages_meta.detail.url | default: '' %}
+
+  {% for p in pages %}
+    {% assign pid_str = p.id | append: '' %}
+    {% if pid_str == wsc_pages_meta.natural.numericId %}
+      {% assign wsc_url_natural = p.url %}
+    {% elsif pid_str == wsc_pages_meta.lab.numericId %}
+      {% assign wsc_url_lab = p.url %}
+    {% elsif pid_str == wsc_pages_meta.gemstones.numericId %}
+      {% assign wsc_url_gemstones = p.url %}
+    {% elsif pid_str == wsc_pages_meta.colored.numericId %}
+      {% assign wsc_url_colored = p.url %}
+    {% elsif pid_str == wsc_pages_meta.detail.numericId %}
+      {% assign wsc_url_detail = p.url %}
+    {% endif %}
+  {% endfor %}
+
+  {% if wsc_is_diamond_product %}
+    {% assign wsc_dia_id = product.metafields.diamond_builder.diamond_id.value | default: '' | strip %}
+    {% assign wsc_dia_redirect = product.metafields.diamond_builder.detail_url.value | default: '' | strip %}
+    {% if wsc_dia_redirect == blank and wsc_url_detail != blank and wsc_dia_id != blank %}
+      {% assign wsc_dia_sep = '?' %}
+      {% if wsc_url_detail contains '?' %}
+        {% assign wsc_dia_sep = '&' %}
+      {% endif %}
+      {% capture wsc_dia_redirect %}{{ wsc_url_detail }}{{ wsc_dia_sep }}pid={{ wsc_dia_id | url_encode }}{% endcapture %}
+    {% endif %}
+    {% if wsc_dia_redirect == blank %}
+      {% assign wsc_dia_redirect = wsc_url_natural | default: wsc_ring_url | default: '/' %}
+    {% endif %}
+    <style>
+      main, .shopify-section { opacity: 0 !important; pointer-events: none !important; }
+    </style>
+    <script>
+      (function () {
+        var target = {{ wsc_dia_redirect | json }};
+        if (target && window.location.href !== target) {
+          window.location.replace(target);
+        }
+      })();
+    </script>
+  {% else %}
     {% assign wsc_app_url = block.settings.app_url | strip %}
     {% if wsc_app_url == blank %}
       {% assign wsc_app_url = wsc_setting.appUrl | default: '' %}
     {% endif %}
 
     {% assign wsc_cats = wsc_setting.enabledCategories %}
+    {% assign wsc_needs_builder_ui = false %}
+    {% if wsc_is_ring_collection or wsc_is_ring_product or wsc_page_type != blank %}
+      {% assign wsc_needs_builder_ui = true %}
+    {% endif %}
 
-    <link rel="stylesheet" href="{{ 'dr-builder.css' | asset_url }}">
+    {% if wsc_needs_builder_ui %}
+      <link rel="stylesheet" href="{{ 'dr-builder.css' | asset_url }}">
+    {% endif %}
 
     <script>
       window.__WSC_DR_CONFIG__ = {

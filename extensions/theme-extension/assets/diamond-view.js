@@ -259,6 +259,7 @@
       '" id="wsc-choose-diamond-btn">' +
       (isSelected ? "✓ Selected — Continue Pairing Setting" : "Select This Diamond") +
       "</button>" +
+      '<span id="wsc-detail-cart-status"></span>' +
       "</div>" +
       "</div></div>";
 
@@ -268,6 +269,20 @@
     if (btn && window.WscByor) {
       btn.addEventListener("click", function () {
         window.WscByor.chooseDiamond(diamond);
+      });
+    }
+
+    if (window.WscByor && window.WscByor.isDiamondInCart) {
+      var currentStoneId = String(diamond.id || "");
+      window.WscByor.isDiamondInCart(diamond).then(function (inCart) {
+        if (!inCart) return;
+        var slot = document.getElementById("wsc-detail-cart-status");
+        var chooseEl = document.getElementById("wsc-choose-diamond-btn");
+        if (!slot || (diamond.id && String(diamond.id) !== currentStoneId)) return;
+        slot.innerHTML = '<a class="wsc-btn-cart-link" href="/cart">✓ Already in Cart · Go to Cart</a>';
+        if (chooseEl && !isSelected) {
+          chooseEl.textContent = "Pair With Ring Setting";
+        }
       });
     }
   }

@@ -2,6 +2,7 @@
   var cfg = window.__WSC_DR_CONFIG__;
   if (!cfg) return;
 
+  var nativeFetch = window.fetch.bind(window);
   var DIAMOND_KEY = "wsc_byor_diamond";
   var PREVIEW_KEY = "wsc_byor_diamond_preview";
   var SETTING_KEY = "wsc_byor_setting";
@@ -201,23 +202,28 @@
 
     modal.querySelector('[data-wsc-action="cart"]').addEventListener("click", function () {
       var actionBtn = modal.querySelector('[data-wsc-action="cart"]');
+      var titleEl = actionBtn ? actionBtn.querySelector("strong") : null;
+      var origLabel = titleEl ? titleEl.textContent : "";
       if (actionBtn) actionBtn.disabled = true;
+      if (titleEl) titleEl.textContent = "Preparing Diamond for Cart…";
       if (setting && setting.variantId) {
         addCombinedToCart(setting, diamond).finally(function () {
           closePopup();
           if (actionBtn) actionBtn.disabled = false;
+          if (titleEl) titleEl.textContent = origLabel;
         });
       } else {
         addLooseDiamondToCart(diamond).finally(function () {
           closePopup();
           if (actionBtn) actionBtn.disabled = false;
+          if (titleEl) titleEl.textContent = origLabel;
         });
       }
     });
   }
 
   function renderStrip() {
-    if (cfg.isCart) {
+    if (cfg.isCart || (!cfg.isRingCollection && !cfg.isRingProduct && !cfg.pageType)) {
       var existingStrip = document.querySelector(".wsc-strip");
       if (existingStrip) existingStrip.remove();
       return;
@@ -391,49 +397,159 @@
     );
   }
 
-  function postCartAdd(items) {
-    return fetch("/cart/add.js", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ items: items }),
-    })
-      .then(function (res) {
-        if (!res.ok) throw new Error("Failed to add items to cart (" + res.status + ")");
-        return res.json();
+  function sleep(ms) {
+    return new Promise(function (resolve) {
+      setTimeout(resolve, ms);
+    });
+  }
+
+  function waitUntilDiamondReady(handle) {
+    if (!handle) return Promise.resolve(false);
+    var attempt = 0;
+    var maxAttempts = 12;
+
+    function poll() {
+      attempt += 1;
+      return nativeFetch("/products/" + encodeURIComponent(handle) + ".js?cacheBust=" + Date.now(), {
+        headers: { Accept: "application/json" },
       })
-      .then(function () {
-        window.location.href = "/cart";
+        .then(function (res) {
+          if (!res.ok) return false;
+          return res.json().then(function (p) {
+            return Boolean(
+              p &&
+                (p.available === true ||
+                  (Array.isArray(p.variants) && p.variants[0] && p.variants[0].available))
+            );
+          });
+        })
+        .catch(function () {
+          return false;
+        })
+        .then(function (ready) {
+          if (ready) return true;
+          if (attempt >= maxAttempts) return false;
+          return sleep(850).then(poll);
+        });
+    }
+
+    return poll();
+  }
+
+  function isDiamondInCart(diamond, skuOverride) {
+    if (!diamond || !diamond.id) return Promise.resolve(false);
+    var targetId = String(diamond.id);
+    var targetSku = String(skuOverride || diamond.stockId || "").trim();
+    return nativeFetch("/cart.json", { headers: { Accept: "application/json" } })
+      .then(function (r) {
+        return r.ok ? r.json() : null;
+      })
+      .then(function (cart) {
+        var items = (cart && cart.items) || [];
+        return items.some(function (item) {
+          var props = item.properties || {};
+          if (props._wsc_diamond_id && String(props._wsc_diamond_id) === targetId) return true;
+          if (targetSku && (String(item.sku || "") === targetSku || String(props.SKU || "") === targetSku)) {
+            return true;
+          }
+          return false;
+        });
+      })
+      .catch(function () {
+        return false;
       });
   }
 
+  function postCartAdd(items, maxAttempts) {
+    var totalTries = maxAttempts || 4;
+
+    function tryPost(attempt) {
+      return nativeFetch("/cart/add.js", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ items: items }),
+      }).then(function (res) {
+        if (res.status === 422 && attempt < totalTries) {
+          return sleep(1400).then(function () {
+            return tryPost(attempt + 1);
+          });
+        }
+        if (!res.ok) {
+          return res
+            .json()
+            .catch(function () {
+              return {};
+            })
+            .then(function (errJson) {
+              throw new Error(
+                (errJson && (errJson.description || errJson.message)) ||
+                  "Failed to add items to cart (" + res.status + ")"
+              );
+            });
+        }
+        return res.json();
+      });
+    }
+
+    return tryPost(1);
+  }
+
   function addLooseDiamondToCart(diamond) {
-    return prepareDiamondForCart(diamond, null, "")
-      .then(function (prep) {
-        var stone = (prep && prep.diamond) || diamond;
-        var detailUrl = (prep && prep.detailUrl) || getAbsoluteDetailUrl(stone);
-        var sku = (prep && prep.sku) || stone.stockId || "";
-        if (!prep || !prep.diamondVariantNumericId) {
-          window.alert(
-            "Unable to add a standalone diamond right now. Select a ring setting to bundle it, or grant product publication permissions in the app."
-          );
+    return isDiamondInCart(diamond)
+      .then(function (alreadyInCart) {
+        if (alreadyInCart) {
+          var savedDia = readJson(DIAMOND_KEY);
+          if (savedDia && String(savedDia.id) === String(diamond.id)) {
+            writeJson(DIAMOND_KEY, null);
+          }
+          window.location.href = "/cart";
           return null;
         }
-        return postCartAdd([
-          {
-            id: Number(prep.diamondVariantNumericId),
-            quantity: 1,
-            properties: buildDiamondProps(stone, {
-              SKU: sku,
-              "Diamond Detail": detailUrl,
-              _wsc_diamond_id: String(stone.id || ""),
-              _wsc_byor_role: "diamond",
-            }),
-          },
-        ]);
+        return prepareDiamondForCart(diamond, null, "").then(function (prep) {
+          if (prep && prep.ok === false) {
+            throw new Error(prep.error || "Selected diamond is no longer available.");
+          }
+          var stone = (prep && prep.diamond) || diamond;
+          var detailUrl = (prep && prep.detailUrl) || getAbsoluteDetailUrl(stone);
+          var sku = (prep && prep.sku) || stone.stockId || "";
+          if (!prep || !prep.diamondVariantNumericId) {
+            window.alert(
+              "Unable to add a standalone diamond right now. Select a ring setting to bundle it, or grant product publication permissions in the app."
+            );
+            return null;
+          }
+          var readyPromise =
+            prep.notNew === false && prep.diamondProductHandle
+              ? waitUntilDiamondReady(prep.diamondProductHandle)
+              : Promise.resolve(true);
+
+          return readyPromise
+            .then(function () {
+              return postCartAdd([
+                {
+                  id: Number(prep.diamondVariantNumericId),
+                  quantity: 1,
+                  properties: buildDiamondProps(stone, {
+                    SKU: sku,
+                    "Diamond Detail": detailUrl,
+                    _wsc_diamond_id: String(stone.id || ""),
+                    _wsc_byor_role: "diamond",
+                  }),
+                },
+              ]);
+            })
+            .then(function () {
+              var currentSelected = readJson(DIAMOND_KEY);
+              if (currentSelected && String(currentSelected.id) === String(stone.id)) {
+                writeJson(DIAMOND_KEY, null);
+              }
+              window.location.href = "/cart";
+            });
+        });
       })
       .catch(function (err) {
         console.error("[byor-strip] Loose diamond cart error:", err);
-        window.alert("Could not add diamond to cart. Please try again.");
+        window.alert(err && err.message ? err.message : "Could not add diamond to cart. Please try again.");
       });
   }
 
@@ -443,12 +559,20 @@
 
     return prepareDiamondForCart(diamond, setting, bundleId)
       .then(function (prep) {
+        if (prep && prep.ok === false) {
+          throw new Error(prep.error || "Selected diamond is no longer available.");
+        }
         var stone = (prep && prep.diamond) || diamond;
         var detailUrl = (prep && prep.detailUrl) || getAbsoluteDetailUrl(stone);
         var sku = (prep && prep.sku) || stone.stockId || "";
         var ringMapId = (prep && prep.ringMappingId) || String(setting.productId || "");
         var total = Number(setting.price || 0) + Number(stone.price || 0);
         var paired = Boolean(prep && prep.mode === "paired_variants" && prep.diamondVariantNumericId);
+
+        var readyPromise =
+          paired && prep.notNew === false && prep.diamondProductHandle
+            ? waitUntilDiamondReady(prep.diamondProductHandle)
+            : Promise.resolve(true);
 
         var settingProps = buildDiamondProps(stone, {
           SKU: sku,
@@ -487,11 +611,20 @@
           properties: settingProps,
         });
 
-        return postCartAdd(items);
+        return readyPromise
+          .then(function () {
+            return postCartAdd(items);
+          })
+          .then(function () {
+            writeJson(DIAMOND_KEY, null);
+            writeJson(SETTING_KEY, null);
+            writeJson(PREVIEW_KEY, null);
+            window.location.href = "/cart";
+          });
       })
       .catch(function (err) {
         console.error("[byor-strip] Cart error:", err);
-        window.alert("Could not add the ring bundle to cart. Please try again.");
+        window.alert(err && err.message ? err.message : "Could not add the ring bundle to cart. Please try again.");
       });
   }
 
@@ -671,14 +804,78 @@
           openChooseDiamondPagePopup();
         }
       });
+
+      // Case C: Setting-only fallback (buy mounting without a diamond)
+      if (!form.querySelector("#wsc-add-setting-only-btn")) {
+        var settingOnlyBtn = document.createElement("button");
+        settingOnlyBtn.type = "button";
+        settingOnlyBtn.id = "wsc-add-setting-only-btn";
+        settingOnlyBtn.className = "wsc-setting-only-btn";
+        settingOnlyBtn.textContent = "Add setting without a diamond";
+
+        if (chooseBtn.nextSibling && chooseBtn.parentNode) {
+          chooseBtn.parentNode.insertBefore(settingOnlyBtn, chooseBtn.nextSibling);
+        } else if (chooseBtn.parentNode) {
+          chooseBtn.parentNode.appendChild(settingOnlyBtn);
+        }
+
+        settingOnlyBtn.addEventListener("click", function () {
+          var activeVar = getActiveProductVariant();
+          var variantId = activeVar ? activeVar.id : cfg.product.selectedVariantId;
+          if (!variantId) return;
+          settingOnlyBtn.disabled = true;
+          settingOnlyBtn.textContent = "Adding setting to cart…";
+          postCartAdd([{ id: Number(variantId), quantity: 1 }])
+            .then(function () {
+              window.location.href = "/cart";
+            })
+            .catch(function (err) {
+              console.error("[byor-strip] Setting-only cart error:", err);
+              window.alert("Could not add setting to cart. Please try again.");
+            })
+            .finally(function () {
+              settingOnlyBtn.disabled = false;
+              settingOnlyBtn.textContent = "Add setting without a diamond";
+            });
+        });
+      }
     }
   }
 
-  function setupCartPage() {
-    if (!cfg.isCart) return;
-    fetch("/cart.json", { headers: { Accept: "application/json" } })
+  var isReconcilingOrphans = false;
+
+  function refreshCartDrawerSections() {
+    nativeFetch("/?sections=cart-drawer,cart-icon-bubble", {
+      headers: { Accept: "application/json" },
+    })
       .then(function (r) {
-        return r.json();
+        return r.ok ? r.json() : null;
+      })
+      .then(function (sections) {
+        if (!sections) return;
+        ["cart-drawer", "cart-icon-bubble"].forEach(function (secId) {
+          if (!sections[secId]) return;
+          var doc = new DOMParser().parseFromString(sections[secId], "text/html");
+          var nextEl = doc.getElementById("shopify-section-" + secId) || doc.body.firstElementChild;
+          var curEl = document.getElementById("shopify-section-" + secId);
+          if (curEl && nextEl) {
+            curEl.innerHTML = nextEl.innerHTML;
+          }
+        });
+        document.dispatchEvent(new CustomEvent("cart:refresh"));
+      })
+      .catch(function () {
+        /* ignore if theme does not expose standard Dawn section IDs */
+      });
+  }
+
+  function reconcileOrphanBundles(fromInterceptedChange) {
+    if (isReconcilingOrphans) return Promise.resolve(false);
+    isReconcilingOrphans = true;
+
+    return nativeFetch("/cart.json", { headers: { Accept: "application/json" } })
+      .then(function (r) {
+        return r.ok ? r.json() : null;
       })
       .then(function (cart) {
         var items = (cart && cart.items) || [];
@@ -706,19 +903,49 @@
         });
 
         if (hasOrphans) {
-          return fetch("/cart/update.js", {
+          return nativeFetch("/cart/update.js", {
             method: "POST",
             headers: { "Content-Type": "application/json", Accept: "application/json" },
             body: JSON.stringify({ updates: orphanUpdates }),
           }).then(function () {
-            window.location.reload();
+            if (cfg.isCart) {
+              window.location.reload();
+            } else if (fromInterceptedChange) {
+              refreshCartDrawerSections();
+            }
+            return true;
           });
         }
-        return null;
+        return false;
       })
       .catch(function (err) {
         console.warn("[byor-strip] Cart verification skipped:", err);
+        return false;
+      })
+      .finally(function () {
+        isReconcilingOrphans = false;
       });
+  }
+
+  function installCartDrawerInterceptor() {
+    if (window.__wscFetchPatched) return;
+    window.__wscFetchPatched = true;
+
+    window.fetch = function (input, init) {
+      var reqUrl = typeof input === "string" ? input : (input && input.url) || "";
+      var isCartMutation = /\/cart\/(change|update)(\.js)?(\?|$)/i.test(reqUrl);
+      var resultPromise = nativeFetch(input, init);
+      if (isCartMutation && !isReconcilingOrphans) {
+        resultPromise.then(function (res) {
+          if (res && res.ok) {
+            setTimeout(function () {
+              reconcileOrphanBundles(true);
+            }, 60);
+          }
+        });
+      }
+      return resultPromise;
+    };
   }
 
   window.WscByor = {
@@ -729,6 +956,7 @@
         preview: readJson(PREVIEW_KEY),
       };
     },
+    isDiamondInCart: isDiamondInCart,
     savePreviewDiamond: function (diamond) {
       if (!diamond || !diamond.id) return;
       writeJson(PREVIEW_KEY, Object.assign({}, diamond, { cachedAt: Date.now() }));
@@ -760,11 +988,12 @@
   };
 
   function boot() {
+    installCartDrawerInterceptor();
     if (!cfg.isCart) {
       renderStrip();
       setupRingProductPage();
     } else {
-      setupCartPage();
+      reconcileOrphanBundles(false);
     }
   }
 

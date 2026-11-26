@@ -1077,6 +1077,51 @@ main:has(.wsc-builder-mount) .page-width--narrow {
   background-size: 200% 100%;
 }
 
+.wsc-setting-only-btn {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  padding: 9px 14px;
+  background: transparent;
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+
+.wsc-setting-only-btn:hover:not(:disabled) {
+  border-color: #0f172a;
+  color: #0f172a;
+  background: #f8fafc;
+}
+
+.wsc-setting-only-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.wsc-btn-cart-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 13px 20px;
+  border-radius: 10px;
+  background: #16a34a;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.15s ease;
+}
+
+.wsc-btn-cart-link:hover {
+  background: #15803d;
+  color: #ffffff;
+}
+
 /* ---------- Responsive Breakpoints ---------- */
 @media (max-width: 1180px) {
   .wsc-grid,

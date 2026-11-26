@@ -301,3 +301,23 @@ model Diamond {
   @@index([status, carats, id])
   @@index([status, updatedAt, id])
 }
+
+/// Per-shop cached mapping between a Diamond record and its JIT Shopify Product.
+/// Enables O(1) Mongo-first deduplication on warm Add-to-Cart without querying
+/// Shopify Admin GraphQL first, and tracks the last synced price and ring link.
+model ShopifyDiamondMap {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  shop             String
+  diamondId        String   @db.ObjectId
+  sku              String
+  shopifyProductId String
+  shopifyVariantId String
+  productHandle    String?
+  lastPrice        Float
+  ringMappingId    String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([shop, diamondId])
+  @@index([shop, sku])
+}

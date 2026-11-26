@@ -1,3 +1,4 @@
+import prisma from "../db.server.js";
 import { unauthenticated } from "../shopify.server.js";
 import { getDiamondById } from "./diamonds.js";
 import {
@@ -6,6 +7,30 @@ import {
   normalizeShop,
   toNumericId,
 } from "./store-setting.js";
+
+const GET_PRODUCT_BY_ID_QUERY = `#graphql
+  query VerifyCachedDiamondProduct($id: ID!) {
+    node(id: $id) {
+      ... on Product {
+        id
+        handle
+        status
+        media(first: 1) {
+          nodes {
+            id
+          }
+        }
+        variants(first: 1) {
+          nodes {
+            id
+            price
+            sku
+          }
+        }
+      }
+    }
+  }
+`;
 
 const FIND_PRODUCT_BY_SKU_QUERY = `#graphql
   query FindDiamondProductBySku($query: String!) {
@@ -160,11 +185,50 @@ async function publishToOnlineStore(admin, productId) {
   }
 }
 
+async function upsertDiamondProductMap({
+  shop,
+  diamondId,
+  sku,
+  shopifyProductId,
+  shopifyVariantId,
+  productHandle,
+  lastPrice,
+  ringMappingId,
+}) {
+  if (!prisma?.shopifyDiamondMap) return;
+  try {
+    await prisma.shopifyDiamondMap.upsert({
+      where: { shop_diamondId: { shop, diamondId } },
+      create: {
+        shop,
+        diamondId,
+        sku,
+        shopifyProductId,
+        shopifyVariantId,
+        productHandle: productHandle || null,
+        lastPrice,
+        ringMappingId: ringMappingId || null,
+      },
+      update: {
+        sku,
+        shopifyProductId,
+        shopifyVariantId,
+        productHandle: productHandle || null,
+        lastPrice,
+        ringMappingId: ringMappingId || null,
+      },
+    });
+  } catch (error) {
+    console.warn("[cart-jit] Failed to persist ShopifyDiamondMap:", error?.message);
+  }
+}
+
 /**
- * Re-verifies active diamond stock & price in MongoDB, creates/updates a dedicated
- * Shopify product for THAT diamond (with SKU, Ring Mapping ID, Price, Image,
- * Description & Diamond Detail Page Link), publishes it to Online Store, and
- * returns the live `diamondVariantNumericId` ready for `POST /cart/add.js`.
+ * Re-verifies active diamond stock & price in MongoDB, reuses our Mongo-cached
+ * mapping or creates/updates a dedicated Shopify product for THAT diamond (with
+ * SKU, Ring Mapping ID, Price, Image, Description & Diamond Detail Page Link),
+ * publishes it to Online Store, and returns `diamondVariantNumericId` + `notNew`
+ * ready for `POST /cart/add.js`.
  */
 export async function prepareDiamondCartItem({
   shop,
@@ -176,14 +240,30 @@ export async function prepareDiamondCartItem({
   bundleId = "",
 }) {
   const domain = normalizeShop(shop);
+  const cleanDiamondId = String(diamondId || "").trim();
   if (!domain) {
     return { ok: false, status: 400, error: "Missing shop domain." };
   }
+  if (!cleanDiamondId) {
+    return { ok: false, status: 400, error: "Missing diamondId." };
+  }
 
-  const [storeSetting, storeBaseUrl, diamond] = await Promise.all([
+  const [storeSetting, storeBaseUrl, diamond, cachedMap] = await Promise.all([
     getStoreSetting(domain),
     getStorefrontBaseUrl(domain),
-    getDiamondById(String(diamondId || "").trim()),
+    getDiamondById(cleanDiamondId),
+    prisma?.shopifyDiamondMap && /^[a-f0-9]{24}$/i.test(cleanDiamondId)
+      ? prisma.shopifyDiamondMap.findUnique({
+          where: { shop_diamondId: { shop: domain, diamondId: cleanDiamondId } },
+          select: {
+            shopifyProductId: true,
+            shopifyVariantId: true,
+            productHandle: true,
+            lastPrice: true,
+            ringMappingId: true,
+          },
+        })
+      : Promise.resolve(null),
   ]);
 
   if (storeSetting?.builderEnabled === false) {
@@ -226,12 +306,69 @@ export async function prepareDiamondCartItem({
   }
 
   try {
-    const existingRes = await admin.graphql(FIND_PRODUCT_BY_SKU_QUERY, {
-      variables: { query: `sku:${sku}` },
-    });
-    const existingJson = await existingRes.json();
-    const existingProduct = existingJson?.data?.products?.nodes?.[0] || null;
-    const existingVariantId = existingProduct?.variants?.nodes?.[0]?.id || null;
+    // 1. O(1) Mongo-first verification -> fallback SKU search only on cache miss
+    let existingProduct = null;
+    let verifiedFromCache = false;
+    if (cachedMap?.shopifyProductId) {
+      try {
+        const nodeRes = await admin.graphql(GET_PRODUCT_BY_ID_QUERY, {
+          variables: { id: cachedMap.shopifyProductId },
+        });
+        const nodeJson = await nodeRes.json();
+        const nodeProduct = nodeJson?.data?.node;
+        if (nodeProduct?.id && nodeProduct?.variants?.nodes?.[0]?.id) {
+          existingProduct = nodeProduct;
+          verifiedFromCache = true;
+        }
+      } catch {
+        existingProduct = null;
+      }
+    }
+
+    if (!existingProduct) {
+      const existingRes = await admin.graphql(FIND_PRODUCT_BY_SKU_QUERY, {
+        variables: { query: `sku:${sku}` },
+      });
+      const existingJson = await existingRes.json();
+      existingProduct = existingJson?.data?.products?.nodes?.[0] || null;
+    }
+
+    const existingVariant = existingProduct?.variants?.nodes?.[0] || null;
+    const existingVariantId = existingVariant?.id || null;
+    const isArchived = existingProduct?.status === "ARCHIVED";
+
+    // Fast path: cached, published, live, price & ring mapping unchanged -> skip mutations
+    const existingPriceDiffers =
+      !existingVariant ||
+      Math.abs(Number(existingVariant.price || 0) - authoritativePrice) > 0.005;
+    const ringMappingDiffers =
+      String(cachedMap?.ringMappingId || "") !== String(ringMappingNumericId || "");
+
+    if (
+      verifiedFromCache &&
+      existingProduct?.id &&
+      existingVariantId &&
+      !isArchived &&
+      !existingPriceDiffers &&
+      !ringMappingDiffers
+    ) {
+      return {
+        ok: true,
+        notNew: true,
+        mode: "paired_variants",
+        diamondProductId: existingProduct.id,
+        diamondProductNumericId: toNumericId(existingProduct.id),
+        diamondProductHandle: existingProduct.handle,
+        diamondVariantId: existingVariantId,
+        diamondVariantNumericId: Number(toNumericId(existingVariantId)),
+        sku,
+        price: authoritativePrice,
+        image: diamond.image || "",
+        detailUrl: resolvedDetailUrl,
+        ringMappingId: ringMappingNumericId,
+        diamond,
+      };
+    }
 
     const tags = ["diamond-builder-feed", "byor-diamond"];
     if (ringMappingNumericId) tags.push(`ring-map-${ringMappingNumericId}`);
@@ -332,15 +469,17 @@ export async function prepareDiamondCartItem({
         : {}),
     });
 
-    const hasImage = isValidHttpsImage(diamond.image);
+    // Only upload image media when creating a product or when an existing product has none.
+    const existingHasMedia = Boolean(existingProduct?.media?.nodes?.length);
+    const shouldUploadImage = isValidHttpsImage(diamond.image) && !existingHasMedia;
     let setRes = await admin.graphql(PRODUCT_SET_MUTATION, {
-      variables: { productSet: buildInput("UNLISTED", hasImage), synchronous: true },
+      variables: { productSet: buildInput("UNLISTED", shouldUploadImage), synchronous: true },
     });
     let setJson = await setRes.json();
     let userErrors = setJson?.data?.productSet?.userErrors ?? [];
 
     // Retry without external image if host fails Shopify media ingestion
-    if (userErrors.length && hasImage) {
+    if (userErrors.length && shouldUploadImage) {
       setRes = await admin.graphql(PRODUCT_SET_MUTATION, {
         variables: { productSet: buildInput("UNLISTED", false), synchronous: true },
       });
@@ -375,22 +514,38 @@ export async function prepareDiamondCartItem({
       };
     }
 
-    const pub = await publishToOnlineStore(admin, createdProduct.id);
-    if (!pub.ok) {
-      return {
-        ok: true,
-        mode: "properties_only",
-        warning: pub.error,
-        diamondVariantNumericId: null,
-        sku,
-        detailUrl: resolvedDetailUrl,
-        ringMappingId: ringMappingNumericId,
-        diamond,
-      };
+    const needsPublish = !verifiedFromCache || isArchived;
+    if (needsPublish) {
+      const pub = await publishToOnlineStore(admin, createdProduct.id);
+      if (!pub.ok) {
+        return {
+          ok: true,
+          mode: "properties_only",
+          warning: pub.error,
+          diamondVariantNumericId: null,
+          sku,
+          detailUrl: resolvedDetailUrl,
+          ringMappingId: ringMappingNumericId,
+          diamond,
+        };
+      }
     }
 
+    await upsertDiamondProductMap({
+      shop: domain,
+      diamondId: String(diamond.id),
+      sku,
+      shopifyProductId: createdProduct.id,
+      shopifyVariantId: variant.id,
+      productHandle: createdProduct.handle,
+      lastPrice: authoritativePrice,
+      ringMappingId: ringMappingNumericId,
+    });
+
+    const isFreshlyAvailable = !existingProduct?.id || isArchived;
     return {
       ok: true,
+      notNew: !isFreshlyAvailable,
       mode: "paired_variants",
       diamondProductId: createdProduct.id,
       diamondProductNumericId: toNumericId(createdProduct.id),
