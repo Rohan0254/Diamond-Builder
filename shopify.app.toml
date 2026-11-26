@@ -7,7 +7,11 @@ name = "Diamond Builder By WS"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "read_themes,write_products,write_metaobjects,write_metaobject_definitions"
+scopes = "read_themes,write_products,write_metaobjects,write_metaobject_definitions,write_content,read_publications,write_publications"
+use_legacy_install_flow = false
+
+[sidekick]
+extensions_summary = "Check Diamond Ring Builder setup status, toggle storefront diamond categories (natural, lab, gemstones, colored), configure ring collection settings, search diamond inventory, and view live builder URLs."
 
 [product.metafields.app.demo_info]
 type = "single_line_text_field"
